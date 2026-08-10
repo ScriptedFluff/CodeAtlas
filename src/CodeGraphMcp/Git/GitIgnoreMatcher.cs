@@ -14,6 +14,7 @@ public sealed class GitIgnoreMatcher
 {
     private readonly string _rootPath;
     private readonly List<IgnoreRule> _rules = [];
+    private readonly HashSet<string> _loadedDirs = new(StringComparer.OrdinalIgnoreCase);
 
     public GitIgnoreMatcher(string rootPath)
     {
@@ -26,10 +27,12 @@ public sealed class GitIgnoreMatcher
     /// </summary>
     public void LoadGitIgnore(string dirPath)
     {
-        var ignoreFile = Path.Combine(dirPath, ".gitignore");
+        var fullDirPath = Path.GetFullPath(dirPath);
+        if (!_loadedDirs.Add(fullDirPath)) return;
+
+        var ignoreFile = Path.Combine(fullDirPath, ".gitignore");
         if (!File.Exists(ignoreFile)) return;
 
-        var fullDirPath = Path.GetFullPath(dirPath);
         string relativeDir = fullDirPath.Equals(_rootPath, StringComparison.OrdinalIgnoreCase)
             ? ""
             : Path.GetRelativePath(_rootPath, fullDirPath).Replace('\\', '/').Trim('/');
@@ -53,6 +56,8 @@ public sealed class GitIgnoreMatcher
     /// </summary>
     public bool IsIgnored(string path, bool isDirectory = false)
     {
+        if (_rules.Count == 0) return false;
+
         var fullPath = Path.GetFullPath(Path.IsPathRooted(path) ? path : Path.Combine(_rootPath, path));
         if (!fullPath.StartsWith(_rootPath, StringComparison.OrdinalIgnoreCase))
             return false;
@@ -76,12 +81,14 @@ public sealed class GitIgnoreMatcher
     {
         public bool IsNegated { get; }
         public bool DirectoryOnly { get; }
+        public string BaseRelativeDir { get; }
         private readonly Regex _regex;
 
-        private IgnoreRule(bool isNegated, bool directoryOnly, Regex regex)
+        private IgnoreRule(bool isNegated, bool directoryOnly, string baseRelativeDir, Regex regex)
         {
             IsNegated = isNegated;
             DirectoryOnly = directoryOnly;
+            BaseRelativeDir = baseRelativeDir;
             _regex = regex;
         }
 
@@ -109,20 +116,24 @@ public sealed class GitIgnoreMatcher
                 line = line[1..];
             }
 
-            if (!string.IsNullOrEmpty(baseRelativeDir))
+            string baseDirNorm = baseRelativeDir.Trim('/');
+            if (!string.IsNullOrEmpty(baseDirNorm))
             {
-                line = $"{baseRelativeDir.Trim('/')}/{line}";
+                line = $"{baseDirNorm}/{line}";
                 anchored = true;
             }
 
             string pattern = ConvertGlobToRegexPattern(line, anchored);
             var regex = new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-            return new IgnoreRule(isNegated, directoryOnly, regex);
+            return new IgnoreRule(isNegated, directoryOnly, baseDirNorm, regex);
         }
 
         public bool IsMatch(string relPath, bool isDirectory)
         {
+            if (!string.IsNullOrEmpty(BaseRelativeDir) && !relPath.StartsWith(BaseRelativeDir, StringComparison.OrdinalIgnoreCase))
+                return false;
+
             return _regex.IsMatch(relPath);
         }
 

@@ -17,7 +17,8 @@ public static class WorkspacePathResolver
         if (string.IsNullOrWhiteSpace(rawPath))
             return Environment.CurrentDirectory;
 
-        return Path.GetFullPath(rawPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var cleaned = rawPath.Trim().Trim('"');
+        return Path.GetFullPath(cleaned).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 
     public static WorkspaceInfo ResolveWorkspace(string? targetDirectory, string? dbDir = null, bool storeLocal = true)

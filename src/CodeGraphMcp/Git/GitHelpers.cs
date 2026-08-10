@@ -88,26 +88,58 @@ public static class GitHelpers
     public static bool IsGitRepo(string repoPath) =>
         RunGit(repoPath, "rev-parse --git-dir") is not null;
 
-    /// <summary>Finds the nearest directory containing a .git folder by walking upwards.</summary>
+    /// <summary>Finds the nearest directory containing a .git folder or file by walking upwards.</summary>
     public static string? FindGitRoot(string startPath)
     {
         var dir = new DirectoryInfo(startPath);
         while (dir is not null)
         {
-            if (Directory.Exists(Path.Combine(dir.FullName, ".git")))
+            var gitPath = Path.Combine(dir.FullName, ".git");
+            if (Directory.Exists(gitPath) || File.Exists(gitPath))
                 return dir.FullName;
             dir = dir.Parent;
         }
         return null;
     }
 
+    private static readonly string GitExecutable = ResolveGitExecutable();
+
+    private static string ResolveGitExecutable()
+    {
+        try
+        {
+            using var p = Process.Start(new ProcessStartInfo("git", "--version") { UseShellExecute = false, CreateNoWindow = true });
+            p?.WaitForExit(2000);
+            if (p?.ExitCode == 0) return "git";
+        }
+        catch { }
+
+        string[] candidatePaths =
+        [
+            @"C:\Program Files\Git\cmd\git.exe",
+            @"C:\Program Files\Git\bin\git.exe",
+            @"C:\Program Files (x86)\Git\cmd\git.exe",
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Programs\Git\cmd\git.exe")
+        ];
+
+        foreach (var path in candidatePaths)
+        {
+            if (File.Exists(path)) return path;
+        }
+
+        return "git";
+    }
+
     private static string? RunGit(string cwd, string args)
     {
         try
         {
-            var psi = new ProcessStartInfo("git", args)
+            var cleanCwd = cwd.Trim().Trim('"');
+            if (!Directory.Exists(cleanCwd)) return null;
+
+            var psi = new ProcessStartInfo(GitExecutable, args)
             {
-                WorkingDirectory       = cwd,
+                WorkingDirectory       = cleanCwd,
                 RedirectStandardOutput = true,
                 RedirectStandardError  = true,
                 UseShellExecute        = false,
@@ -115,9 +147,18 @@ public static class GitHelpers
             };
             using var p = Process.Start(psi);
             if (p is null) return null;
-            var output = p.StandardOutput.ReadToEnd();
-            p.WaitForExit();
-            return p.ExitCode == 0 ? output : null;
+
+            var stdoutTask = p.StandardOutput.ReadToEndAsync();
+            var stderrTask = p.StandardError.ReadToEndAsync();
+
+            if (!p.WaitForExit(60000))
+            {
+                try { p.Kill(); } catch { }
+                return null;
+            }
+
+            Task.WaitAll(stdoutTask, stderrTask);
+            return p.ExitCode == 0 ? stdoutTask.Result : null;
         }
         catch
         {

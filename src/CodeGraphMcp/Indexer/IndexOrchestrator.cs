@@ -12,7 +12,8 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
     private static readonly HashSet<string> DefaultIgnoredDirs = new(StringComparer.OrdinalIgnoreCase)
     {
         ".git", ".agent-index", "bin", "obj",
-        "node_modules", "dist", ".next", "coverage", ".vs"
+        "node_modules", "dist", ".next", "coverage", ".vs",
+        "packages", "TestResults", "publish", "out", "temp", "tmp", "vendor", ".idea"
     };
 
     private readonly Dictionary<string, ILanguageParser> _extensionMap = BuildExtensionMap();
