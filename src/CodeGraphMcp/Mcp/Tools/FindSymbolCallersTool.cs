@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using CodeGraphMcp.Db;
+using CodeGraphMcp.Indexer;
 using CodeGraphMcp.Models;
 using ModelContextProtocol.Server;
 
@@ -11,7 +12,7 @@ public sealed record FindCallersResult(
     string? Note);
 
 [McpServerToolType]
-public sealed class FindSymbolCallersTool(CodeGraphDb db)
+public sealed class FindSymbolCallersTool(IDynamicWorkspaceService workspaceService)
 {
     [McpServerTool]
     [Description("""
@@ -20,9 +21,13 @@ public sealed class FindSymbolCallersTool(CodeGraphDb db)
         Note: the symbol_references table is populated during indexing when reference analysis is active.
         Returns an empty list with a note if the table has not yet been populated.
         """)]
-    public FindCallersResult FindSymbolCallers(
-        [Description("Symbol name to find callers of (exact, case-insensitive)")] string symbolName)
+    public async Task<FindCallersResult> FindSymbolCallersAsync(
+        [Description("Symbol name to find callers of (exact, case-insensitive)")] string symbolName,
+        [Description("Optional: target repository/workspace directory to query (defaults to active workspace)")] string? targetDirectory = null,
+        CancellationToken ct = default)
     {
+        var context = await workspaceService.GetOrIndexWorkspaceAsync(targetDirectory, ct);
+        var db = context.Db;
         var callers = db.References.FindCallers(symbolName);
 
         if (callers.Count == 0)

@@ -173,7 +173,7 @@ public sealed class CSharpParser : ILanguageParser
             }
         }
         catch { }
-        return default;
+        return default(Node);
     }
 
     private static void TraverseNode(Node node, string filePath, List<Symbol> symbols, string? currentNamespace, string? currentClass)
@@ -198,6 +198,7 @@ public sealed class CSharpParser : ILanguageParser
                 };
 
                 currentClass = nameText;
+                bool isPartial = HasPartialModifier(node);
 
                 symbols.Add(new Symbol
                 {
@@ -212,10 +213,12 @@ public sealed class CSharpParser : ILanguageParser
                     StartByte  = (int)node.StartIndex,
                     EndByte    = (int)node.EndIndex,
                     Signature  = null,
-                    DocComment = ExtractDocComment(node)
+                    DocComment = ExtractDocComment(node),
+                    IsPartial  = isPartial
                 });
             }
         }
+
         else if (type is "method_declaration" or "property_declaration")
         {
             var nameNode = GetNameNode(node);
@@ -266,7 +269,7 @@ public sealed class CSharpParser : ILanguageParser
         }
         catch { }
 
-        return default;
+        return default(Node);
     }
 
     private static string? ExtractSignature(Node node, SymbolType type)
@@ -305,8 +308,7 @@ public sealed class CSharpParser : ILanguageParser
         try
         {
             var prev = node.PreviousNamedSibling;
-            if (prev.Id == IntPtr.Zero || !string.Equals(prev.Type, "comment", StringComparison.Ordinal)) return null;
-
+            if (prev.Id == IntPtr.Zero || prev.Type is null || !string.Equals(prev.Type, "comment", StringComparison.Ordinal)) return null;
             var text = prev.Text;
             if (string.IsNullOrWhiteSpace(text)) return null;
             return text.TrimStart('/', ' ');
@@ -315,5 +317,21 @@ public sealed class CSharpParser : ILanguageParser
         {
             return null;
         }
+    }
+
+    private static bool HasPartialModifier(Node node)
+    {
+        try
+        {
+            foreach (var child in node.Children)
+            {
+                if (child.Type is "modifier" or "modifier_list" && child.Text.Contains("partial", StringComparison.OrdinalIgnoreCase))
+                    return true;
+                if (child.Type == "partial" || string.Equals(child.Text, "partial", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+        catch { }
+        return false;
     }
 }

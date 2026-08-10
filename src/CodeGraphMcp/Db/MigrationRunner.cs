@@ -35,7 +35,12 @@ public static class MigrationRunner
         {
             ApplyMigration(connection, 4, M004_ReferenceFilePathIndex);
         }
+        if (currentVersion < 5)
+        {
+            ApplyMigration(connection, 5, M005_IsPartialColumn);
+        }
     }
+
 
     private static void ApplyMigration(SqliteConnection connection, int version, string sql)
     {
@@ -117,4 +122,9 @@ public static class MigrationRunner
     private const string M004_ReferenceFilePathIndex = """
         CREATE INDEX IF NOT EXISTS idx_refs_file ON symbol_references(file_path);
         """;
+
+    private const string M005_IsPartialColumn = """
+        ALTER TABLE symbols ADD COLUMN is_partial INTEGER NOT NULL DEFAULT 0;
+        """;
 }
+

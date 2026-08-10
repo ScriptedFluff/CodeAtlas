@@ -26,10 +26,10 @@ public sealed class SymbolQueries(SqliteConnection connection)
             insert.CommandText = """
                 INSERT INTO symbols
                     (class_name, symbol_type, symbol_name, language, file_path,
-                     start_line, end_line, start_byte, end_byte, signature, doc_comment)
+                     start_line, end_line, start_byte, end_byte, signature, doc_comment, is_partial)
                 VALUES
                     (@className, @symbolType, @symbolName, @language, @filePath,
-                     @startLine, @endLine, @startByte, @endByte, @signature, @docComment)
+                     @startLine, @endLine, @startByte, @endByte, @signature, @docComment, @isPartial)
                 """;
             insert.Transaction = tx;
 
@@ -44,6 +44,7 @@ public sealed class SymbolQueries(SqliteConnection connection)
             var pEndByte    = insert.Parameters.Add("@endByte",    SqliteType.Integer);
             var pSignature  = insert.Parameters.Add("@signature",  SqliteType.Text);
             var pDocComment = insert.Parameters.Add("@docComment", SqliteType.Text);
+            var pIsPartial  = insert.Parameters.Add("@isPartial",  SqliteType.Integer);
 
             foreach (var sym in symbols)
             {
@@ -58,8 +59,10 @@ public sealed class SymbolQueries(SqliteConnection connection)
                 pEndByte.Value    = sym.EndByte;
                 pSignature.Value  = (object?)sym.Signature  ?? DBNull.Value;
                 pDocComment.Value = (object?)sym.DocComment ?? DBNull.Value;
+                pIsPartial.Value  = sym.IsPartial ? 1 : 0;
                 insert.ExecuteNonQuery();
             }
+
 
             tx.Commit();
         }
@@ -101,7 +104,7 @@ public sealed class SymbolQueries(SqliteConnection connection)
         cmd.CommandText = """
             SELECT id, symbol_name, symbol_type, class_name, language,
                    file_path, start_line, end_line, start_byte, end_byte,
-                   signature, doc_comment
+                   signature, doc_comment, is_partial
             FROM symbols
             WHERE symbol_name = @exact COLLATE NOCASE
                OR symbol_name LIKE @pattern COLLATE NOCASE
@@ -129,6 +132,7 @@ public sealed class SymbolQueries(SqliteConnection connection)
                 EndByte    = reader.GetInt32(9),
                 Signature  = reader.IsDBNull(10) ? null : reader.GetString(10),
                 DocComment = reader.IsDBNull(11) ? null : reader.GetString(11),
+                IsPartial  = reader.GetInt32(12) == 1,
             });
         }
         return results;
@@ -142,7 +146,7 @@ public sealed class SymbolQueries(SqliteConnection connection)
             ? """
                 SELECT id, symbol_name, symbol_type, class_name, language,
                        file_path, start_line, end_line, start_byte, end_byte,
-                       signature, doc_comment
+                       signature, doc_comment, is_partial
                 FROM symbols
                 WHERE symbol_type = @type
                 ORDER BY file_path, start_line;
@@ -150,7 +154,7 @@ public sealed class SymbolQueries(SqliteConnection connection)
             : """
                 SELECT id, symbol_name, symbol_type, class_name, language,
                        file_path, start_line, end_line, start_byte, end_byte,
-                       signature, doc_comment
+                       signature, doc_comment, is_partial
                 FROM symbols
                 WHERE symbol_type = @type AND language = @lang COLLATE NOCASE
                 ORDER BY file_path, start_line;
@@ -177,6 +181,7 @@ public sealed class SymbolQueries(SqliteConnection connection)
                 EndByte    = reader.GetInt32(9),
                 Signature  = reader.IsDBNull(10) ? null : reader.GetString(10),
                 DocComment = reader.IsDBNull(11) ? null : reader.GetString(11),
+                IsPartial  = reader.GetInt32(12) == 1,
             });
         }
         return results;
@@ -192,6 +197,14 @@ public sealed class SymbolQueries(SqliteConnection connection)
         while (reader.Read())
             result[reader.GetString(0)] = reader.GetInt32(1);
         return result;
+    }
+
+    /// <summary>Returns total number of symbols in the database.</summary>
+    public int GetCount()
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM symbols;";
+        return (int)(long)(cmd.ExecuteScalar() ?? 0L);
     }
 
     /// <summary>
@@ -244,4 +257,85 @@ public sealed class SymbolQueries(SqliteConnection connection)
         var result = cmd.ExecuteScalar();
         return result is DBNull or null ? null : Convert.ToInt64(result);
     }
+
+    /// <summary>
+    /// Gets all declaration locations for a symbol across partial/merged files.
+    /// </summary>
+    public IReadOnlyList<Symbol> GetDeclarationsForSymbol(string symbolName)
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, symbol_name, symbol_type, class_name, language,
+                   file_path, start_line, end_line, start_byte, end_byte,
+                   signature, doc_comment, is_partial
+            FROM symbols
+            WHERE symbol_name = @name COLLATE NOCASE
+            ORDER BY file_path, start_line;
+            """;
+        cmd.Parameters.AddWithValue("@name", symbolName);
+
+        var results = new List<Symbol>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            results.Add(new Symbol
+            {
+                Id         = reader.GetInt64(0),
+                SymbolName = reader.GetString(1),
+                SymbolType = Enum.Parse<SymbolType>(reader.GetString(2)),
+                ClassName  = reader.IsDBNull(3) ? null : reader.GetString(3),
+                Language   = reader.IsDBNull(4) ? null : reader.GetString(4),
+                FilePath   = reader.GetString(5),
+                StartLine  = reader.GetInt32(6),
+                EndLine    = reader.GetInt32(7),
+                StartByte  = reader.GetInt32(8),
+                EndByte    = reader.GetInt32(9),
+                Signature  = reader.IsDBNull(10) ? null : reader.GetString(10),
+                DocComment = reader.IsDBNull(11) ? null : reader.GetString(11),
+                IsPartial  = reader.GetInt32(12) == 1,
+            });
+        }
+        return results;
+    }
+
+    /// <summary>
+    /// Gets all member symbols (methods, properties) belonging to a class across all partial file declarations.
+    /// </summary>
+    public IReadOnlyList<Symbol> GetMembersForMergedType(string className)
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, symbol_name, symbol_type, class_name, language,
+                   file_path, start_line, end_line, start_byte, end_byte,
+                   signature, doc_comment, is_partial
+            FROM symbols
+            WHERE class_name = @className COLLATE NOCASE
+            ORDER BY file_path, start_line;
+            """;
+        cmd.Parameters.AddWithValue("@className", className);
+
+        var results = new List<Symbol>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            results.Add(new Symbol
+            {
+                Id         = reader.GetInt64(0),
+                SymbolName = reader.GetString(1),
+                SymbolType = Enum.Parse<SymbolType>(reader.GetString(2)),
+                ClassName  = reader.IsDBNull(3) ? null : reader.GetString(3),
+                Language   = reader.IsDBNull(4) ? null : reader.GetString(4),
+                FilePath   = reader.GetString(5),
+                StartLine  = reader.GetInt32(6),
+                EndLine    = reader.GetInt32(7),
+                StartByte  = reader.GetInt32(8),
+                EndByte    = reader.GetInt32(9),
+                Signature  = reader.IsDBNull(10) ? null : reader.GetString(10),
+                DocComment = reader.IsDBNull(11) ? null : reader.GetString(11),
+                IsPartial  = reader.GetInt32(12) == 1,
+            });
+        }
+        return results;
+    }
 }
+

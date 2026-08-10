@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using CodeGraphMcp.Db;
 using CodeGraphMcp.Git;
+using CodeGraphMcp.Indexer;
 using CodeGraphMcp.Models;
 using ModelContextProtocol.Server;
 
@@ -19,9 +20,8 @@ public sealed record SymbolDefinitionResult(
 
 [McpServerToolType]
 public sealed class GetSymbolDefinitionTool(
-    CodeGraphDb db,
-    DirtyFileBuffer buffer,
-    RepoContext repo)
+    IDynamicWorkspaceService workspaceService,
+    IWorkspaceBufferManager bufferManager)
 {
     [McpServerTool]
     [Description("""
@@ -31,11 +31,17 @@ public sealed class GetSymbolDefinitionTool(
         Use this instead of reading entire source files.
         Use % as a wildcard in symbolName (e.g. 'GetUser%' matches GetUserRequest, GetUserById, etc.).
         """)]
-    public SymbolDefinitionResult? GetSymbolDefinition(
+    public async Task<SymbolDefinitionResult?> GetSymbolDefinitionAsync(
         [Description("Symbol name to look up. Use % as wildcard (SQL LIKE).")] string symbolName,
         [Description("Optional: Class, Method, Interface, Property, Enum, Function")] string? symbolType = null,
-        [Description("Optional: filter by relative file path substring")] string? filePath = null)
+        [Description("Optional: filter by relative file path substring")] string? filePath = null,
+        [Description("Optional: target repository/workspace directory to query (defaults to active workspace)")] string? targetDirectory = null,
+        CancellationToken ct = default)
     {
+        var context = await workspaceService.GetOrIndexWorkspaceAsync(targetDirectory, ct);
+        var db = context.Db;
+        var buffer = bufferManager.GetOrCreateBuffer(context.WorkspaceRoot);
+
         // 1. Check dirty buffer first (exact name match only — buffer doesn't support wildcards)
         if (!symbolName.Contains('%'))
         {
@@ -59,7 +65,7 @@ public sealed class GetSymbolDefinitionTool(
                         hit.EndLine,
                         hit.Signature,
                         hit.DocComment,
-                        ReadSourceRange(hit),
+                        ReadSourceRange(context.WorkspaceRoot, hit),
                         IsLive: true);
                 }
             }
@@ -84,15 +90,15 @@ public sealed class GetSymbolDefinitionTool(
             match.EndLine,
             match.Signature,
             match.DocComment,
-            ReadSourceRange(match),
+            ReadSourceRange(context.WorkspaceRoot, match),
             IsLive: false);
     }
 
-    private string? ReadSourceRange(Symbol sym)
+    private static string? ReadSourceRange(string workspaceRoot, Symbol sym)
     {
         try
         {
-            var fullPath = Path.Combine(repo.RepoPath, sym.FilePath);
+            var fullPath = Path.Combine(workspaceRoot, sym.FilePath);
             if (!File.Exists(fullPath)) return null;
             var lines = File.ReadAllLines(fullPath);
             var start = Math.Max(0, sym.StartLine - 1);

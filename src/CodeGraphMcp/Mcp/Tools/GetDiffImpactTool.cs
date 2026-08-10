@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using CodeGraphMcp.Db;
 using CodeGraphMcp.Git;
+using CodeGraphMcp.Indexer;
 using ModelContextProtocol.Server;
 
 namespace CodeGraphMcp.Mcp.Tools;
@@ -19,7 +20,7 @@ public sealed record DiffImpactResult(
     int TotalSymbolsAffected);
 
 [McpServerToolType]
-public sealed class GetDiffImpactTool(CodeGraphDb db, RepoContext repo)
+public sealed class GetDiffImpactTool(IDynamicWorkspaceService workspaceService)
 {
     [McpServerTool]
     [Description("""
@@ -27,34 +28,38 @@ public sealed class GetDiffImpactTool(CodeGraphDb db, RepoContext repo)
         the number of symbols each contains, and currently dirty (uncommitted) files.
         Use this before recommending refactors or when assessing the blast radius of a change.
         """)]
-    public DiffImpactResult GetDiffImpact(
-        [Description("Optional: compare from this specific commit hash instead of the last indexed commit")] string? sinceCommit = null)
+    public async Task<DiffImpactResult> GetDiffImpactAsync(
+        [Description("Optional: compare from this specific commit hash instead of the last indexed commit")] string? sinceCommit = null,
+        [Description("Optional: target repository/workspace directory to query (defaults to active workspace)")] string? targetDirectory = null,
+        CancellationToken ct = default)
     {
+        var context = await workspaceService.GetOrIndexWorkspaceAsync(targetDirectory, ct);
+        var db = context.Db;
+        var repoPath = context.WorkspaceRoot;
+
         var lastIndexedHash = db.IndexState.GetLastCommitHash();
-        var headHash        = GitHelpers.GetHeadCommitHash(repo.RepoPath) ?? "unknown";
-        var branch          = GitHelpers.GetCurrentBranch(repo.RepoPath) ?? "unknown";
+        var headHash        = GitHelpers.GetHeadCommitHash(repoPath) ?? "unknown";
+        var branch          = GitHelpers.GetCurrentBranch(repoPath) ?? "unknown";
 
         var baseHash = sinceCommit ?? lastIndexedHash;
 
         IReadOnlyList<string> changedFiles = baseHash is null
             ? []
-            : GitHelpers.GetChangedFiles(repo.RepoPath, baseHash);
+            : GitHelpers.GetChangedFiles(repoPath, baseHash);
 
-        var dirtyFiles = GitHelpers.GetDirtyFiles(repo.RepoPath);
+        var dirtyFiles = GitHelpers.GetDirtyFiles(repoPath);
 
         var changedImpacts = changedFiles
             .Select(f =>
             {
                 var norm = f.Replace('\\', '/');
                 var count = db.Symbols.CountByFile(norm);
-                // Also check with original path separators if norm returned 0
                 if (count == 0 && norm != f)
                     count = db.Symbols.CountByFile(f);
                 return new FileImpact(f, count, IsDirty: false);
             })
             .ToList();
 
-        // Dirty files not already captured in changedFiles
         var changedSet = changedFiles.Select(f => f.Replace('\\', '/')).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var dirtyImpacts = dirtyFiles
             .Where(f => !changedSet.Contains(f.Replace('\\', '/')))

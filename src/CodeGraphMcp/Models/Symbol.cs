@@ -15,4 +15,6 @@ public sealed record Symbol
     public required int EndByte { get; init; }
     public string? Signature { get; init; }         // Return type + parameters
     public string? DocComment { get; init; }        // XML doc summary (C#) or JSDoc (TS)
+    public bool IsPartial { get; init; }            // True for C# partial classes/types or TS merged interfaces/namespaces
 }
+

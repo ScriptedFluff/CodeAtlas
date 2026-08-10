@@ -57,7 +57,18 @@ public class CSharpParserTests
     {
         var symbols = Parser.Parse("bad.cs", "class { !!!invalid c#").ToList();
     }
+
+    [Fact]
+    public void Parse_PartialClass_SetsIsPartialFlag()
+    {
+        var source = "namespace Test { public partial class PartialService { public void DoStuff() {} } }";
+        var symbols = Parser.Parse("PartialService.cs", source).ToList();
+
+        var cls = symbols.Single(s => s.SymbolName == "PartialService");
+        Assert.True(cls.IsPartial);
+    }
 }
+
 
 public class TypeScriptParserTests
 {
@@ -77,4 +88,15 @@ public class TypeScriptParserTests
         Assert.Contains(symbols, s => s.SymbolName == "getUser"      && s.SymbolType == SymbolType.Method);
         Assert.Contains(symbols, s => s.SymbolName == "UserId"       && s.SymbolType == SymbolType.TypeAlias);
     }
+
+    [Fact]
+    public void Parse_Interface_SetsIsPartialFlagForMerging()
+    {
+        var source = "export interface Config { host: string; }";
+        var symbols = Parser.Parse("config.ts", source).ToList();
+
+        var iface = symbols.Single(s => s.SymbolName == "Config");
+        Assert.True(iface.IsPartial);
+    }
 }
+

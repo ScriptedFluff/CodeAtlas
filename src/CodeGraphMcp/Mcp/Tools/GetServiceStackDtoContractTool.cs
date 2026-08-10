@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using CodeGraphMcp.CrossStack;
 using CodeGraphMcp.Db;
+using CodeGraphMcp.Indexer;
 using ModelContextProtocol.Server;
 
 namespace CodeGraphMcp.Mcp.Tools;
@@ -16,8 +17,8 @@ public sealed record DtoContractResult(
 
 [McpServerToolType]
 public sealed class GetServiceStackDtoContractTool(
-    CodeGraphDb db,
-    ServiceStackLinker linker)
+    IDynamicWorkspaceService workspaceService,
+    IWorkspaceLinkerManager? linkerManager = null)
 {
     [McpServerTool]
     [Description("""
@@ -28,14 +29,19 @@ public sealed class GetServiceStackDtoContractTool(
         Call this before working on any ServiceStack endpoint to understand the
         full stack without manually reading multiple files.
         """)]
-    public DtoContractResult GetServiceStackDtoContract(
-        [Description("C# DTO class name, e.g. 'GetUserBillingRequest'")] string dtoName)
+    public async Task<DtoContractResult> GetServiceStackDtoContractAsync(
+        [Description("C# DTO class name, e.g. 'GetUserBillingRequest'")] string dtoName,
+        [Description("Optional: target repository/workspace directory to query (defaults to active workspace)")] string? targetDirectory = null,
+        CancellationToken ct = default)
     {
-        // Fast path: already linked in a prior call
+        var context = await workspaceService.GetOrIndexWorkspaceAsync(targetDirectory, ct);
+        var db = context.Db;
+
         var cached = db.CrossStack.GetMapping(dtoName);
         if (cached is not null)
             return Map(cached);
 
+        var linker = linkerManager?.GetOrCreateLinker(context.WorkspaceRoot, db) ?? new ServiceStackLinker(db);
         linker.EnsureLinked();
 
         var fresh = db.CrossStack.GetMapping(dtoName);

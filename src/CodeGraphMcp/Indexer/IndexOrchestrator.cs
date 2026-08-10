@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using CodeGraphMcp.Db;
+using CodeGraphMcp.Git;
 using CodeGraphMcp.Models;
 using CodeGraphMcp.Parser;
 using Microsoft.Extensions.Logging;
@@ -8,7 +9,7 @@ namespace CodeGraphMcp.Indexer;
 
 public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>? logger = null)
 {
-    private static readonly HashSet<string> IgnoredDirs = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> DefaultIgnoredDirs = new(StringComparer.OrdinalIgnoreCase)
     {
         ".git", ".agent-index", "bin", "obj",
         "node_modules", "dist", ".next", "coverage", ".vs"
@@ -22,6 +23,7 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
         [
             new CSharpParser(),
             new TypeScriptParser(),
+            new JavaScriptParser(),
             new HtmlParser(),
             new PowerShellParser(),
         ];
@@ -50,7 +52,7 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
             try
             {
                 var source = await File.ReadAllTextAsync(filePath, ct);
-                var relPath = Path.GetRelativePath(repoPath, filePath);
+                var relPath = WorkspacePathNormalizer.NormalizeRelativePath(repoPath, filePath);
                 var symbols = parser.Parse(relPath, source).ToList();
                 var refs = parser.ParseReferences(relPath, source).ToList();
 
@@ -87,6 +89,7 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
 
     private IEnumerable<string> EnumerateFiles(string root)
     {
+        var matcher = new GitIgnoreMatcher(root);
         var queue = new Queue<string>();
         queue.Enqueue(root);
 
@@ -96,18 +99,26 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
 
             if (!Directory.Exists(dir)) continue;
 
+            // Dynamically load nested .gitignore if present
+            matcher.LoadGitIgnore(dir);
+
             foreach (var sub in Directory.GetDirectories(dir))
             {
-                if (!IgnoredDirs.Contains(Path.GetFileName(sub)))
+                var dirName = Path.GetFileName(sub);
+                if (DefaultIgnoredDirs.Contains(dirName))
+                    continue;
+
+                if (!matcher.IsIgnored(sub, isDirectory: true))
                     queue.Enqueue(sub);
             }
 
             foreach (var file in Directory.GetFiles(dir))
             {
                 var ext = Path.GetExtension(file);
-                if (_extensionMap.ContainsKey(ext))
+                if (_extensionMap.ContainsKey(ext) && !matcher.IsIgnored(file, isDirectory: false))
                     yield return file;
             }
         }
     }
 }
+

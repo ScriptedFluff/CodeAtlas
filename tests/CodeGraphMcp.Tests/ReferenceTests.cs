@@ -168,4 +168,36 @@ public class ReferenceDatabaseTests : IDisposable
         Assert.Single(callers);
         Assert.Equal("ProgramClass", callers[0].CallerName);
     }
+
+    [Fact]
+    public void UpsertFile_PartialClass_AggregatesDeclarationsAndMembers()
+    {
+        // 1. Partial class User declared across User.cs and User.Extended.cs
+        var part1 = new[]
+        {
+            new Symbol { SymbolName = "User", SymbolType = SymbolType.Class, FilePath = "User.cs", StartLine = 1, EndLine = 10, StartByte = 0, EndByte = 100, IsPartial = true },
+            new Symbol { SymbolName = "MethodA", SymbolType = SymbolType.Method, ClassName = "User", FilePath = "User.cs", StartLine = 3, EndLine = 5, StartByte = 20, EndByte = 50 }
+        };
+        var part2 = new[]
+        {
+            new Symbol { SymbolName = "User", SymbolType = SymbolType.Class, FilePath = "User.Extended.cs", StartLine = 1, EndLine = 10, StartByte = 0, EndByte = 100, IsPartial = true },
+            new Symbol { SymbolName = "MethodB", SymbolType = SymbolType.Method, ClassName = "User", FilePath = "User.Extended.cs", StartLine = 3, EndLine = 5, StartByte = 20, EndByte = 50 }
+        };
+
+        _db.Symbols.UpsertFile("User.cs", part1);
+        _db.Symbols.UpsertFile("User.Extended.cs", part2);
+
+        // 2. Verify GetDeclarationsForSymbol returns both files
+        var decls = _db.Symbols.GetDeclarationsForSymbol("User");
+        Assert.Equal(2, decls.Count);
+        Assert.Contains(decls, d => d.FilePath == "User.cs" && d.IsPartial);
+        Assert.Contains(decls, d => d.FilePath == "User.Extended.cs" && d.IsPartial);
+
+        // 3. Verify GetMembersForMergedType aggregates MethodA and MethodB
+        var members = _db.Symbols.GetMembersForMergedType("User");
+        Assert.Equal(2, members.Count);
+        Assert.Contains(members, m => m.SymbolName == "MethodA" && m.FilePath == "User.cs");
+        Assert.Contains(members, m => m.SymbolName == "MethodB" && m.FilePath == "User.Extended.cs");
+    }
 }
+

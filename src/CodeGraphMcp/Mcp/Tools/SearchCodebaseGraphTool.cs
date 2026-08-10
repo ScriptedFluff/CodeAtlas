@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using CodeGraphMcp.Db;
 using CodeGraphMcp.Git;
+using CodeGraphMcp.Indexer;
 using CodeGraphMcp.Models;
 using ModelContextProtocol.Server;
 
@@ -21,7 +22,9 @@ public sealed record SearchResult(
     IReadOnlyList<SearchMatch> Matches);
 
 [McpServerToolType]
-public sealed class SearchCodebaseGraphTool(CodeGraphDb db, DirtyFileBuffer buffer)
+public sealed class SearchCodebaseGraphTool(
+    IDynamicWorkspaceService workspaceService,
+    IWorkspaceBufferManager bufferManager)
 {
     [McpServerTool]
     [Description("""
@@ -31,11 +34,17 @@ public sealed class SearchCodebaseGraphTool(CodeGraphDb db, DirtyFileBuffer buff
         Use % as a wildcard: 'User%' matches UserService, UserModel, etc.
         Exact names also work: 'IndexOrchestrator' returns only that symbol.
         """)]
-    public SearchResult SearchCodebaseGraph(
+    public async Task<SearchResult> SearchCodebaseGraphAsync(
         [Description("Symbol name pattern. Use % as wildcard (SQL LIKE style).")] string pattern,
         [Description("Optional: Class, Method, Interface, Property, Enum, Function")] string? symbolType = null,
-        [Description("Optional: csharp, typescript, html, powershell")] string? language = null)
+        [Description("Optional: csharp, typescript, html, powershell")] string? language = null,
+        [Description("Optional: target repository/workspace directory to query (defaults to active workspace)")] string? targetDirectory = null,
+        CancellationToken ct = default)
     {
+        var context = await workspaceService.GetOrIndexWorkspaceAsync(targetDirectory, ct);
+        var db = context.Db;
+        var buffer = bufferManager.GetOrCreateBuffer(context.WorkspaceRoot);
+
         // 1. SQLite results (LIKE supports % wildcards natively)
         var dbMatches = db.Symbols.FindByName(pattern)
             .Where(s => symbolType is null
@@ -48,8 +57,6 @@ public sealed class SearchCodebaseGraphTool(CodeGraphDb db, DirtyFileBuffer buff
             .ToList();
 
         // 2. Dirty buffer results
-        //    FindByName does exact match — only viable for non-wildcard patterns.
-        //    For wildcard patterns, do a manual substring scan across all cached dirty symbols.
         List<SearchMatch> dirtyMatches;
         if (!pattern.Contains('%'))
         {
@@ -64,7 +71,6 @@ public sealed class SearchCodebaseGraphTool(CodeGraphDb db, DirtyFileBuffer buff
         }
         else
         {
-            // Wildcard: convert SQL LIKE pattern (% -> .*) to Regex for accurate matching
             var regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(pattern).Replace("\\%", ".*") + "$";
             var regex = new System.Text.RegularExpressions.Regex(regexPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
@@ -82,7 +88,6 @@ public sealed class SearchCodebaseGraphTool(CodeGraphDb db, DirtyFileBuffer buff
         }
 
         // 3. Merge: dirty buffer takes precedence over SQLite for same (FilePath, SymbolName).
-        //    Normalize path separators — dirty buffer uses '/' but SQLite may store '\'.
         static string NormPath(string p) => p.Replace('\\', '/');
         var dirtyKeys = dirtyMatches
             .Select(m => (NormPath(m.FilePath), m.SymbolName))

@@ -4,19 +4,20 @@ using Microsoft.Extensions.Logging;
 using CodeGraphMcp.CrossStack;
 using CodeGraphMcp.Db;
 using CodeGraphMcp.Git;
+using CodeGraphMcp.Indexer;
 using CodeGraphMcp.Parser;
 using ModelContextProtocol.Server;
 
 namespace CodeGraphMcp.Mcp;
 
 /// <summary>Carries the repository root path into DI without string-keyed services.</summary>
-public sealed record RepoContext(string RepoPath);
+public sealed record RepoContext(string? RepoPath);
 
 public static class McpServer
 {
     public static async Task RunAsync(
-        string repoPath,
-        string dbPath,
+        string? repoPath = null,
+        string? dbPath = null,
         CancellationToken ct = default)
     {
         var parsers = GetParsers();
@@ -34,20 +35,24 @@ public static class McpServer
         builder.Services
             .AddSingleton<RepoContext>(_ => new RepoContext(repoPath))
             .AddSingleton(_ => parsers)
-            .AddSingleton<CodeGraphDb>(_ =>
+            .AddSingleton<IWorkspaceDbManager>(_ => new WorkspaceDbManager(dbDirOverride: dbPath))
+            .AddSingleton<IWorkspaceBufferManager>(sp =>
+                new WorkspaceBufferManager(sp.GetRequiredService<IReadOnlyList<ILanguageParser>>()))
+            .AddSingleton<IWorkspaceLinkerManager, WorkspaceLinkerManager>()
+            .AddSingleton<IDynamicWorkspaceService>(sp =>
+                new DynamicWorkspaceService(sp.GetRequiredService<IWorkspaceDbManager>(), repoPath))
+            .AddSingleton(sp =>
             {
-                var db = new CodeGraphDb(dbPath);
-                db.Migrate();
-                return db;
+                var dbManager = sp.GetRequiredService<IWorkspaceDbManager>();
+                var effectiveRepo = !string.IsNullOrWhiteSpace(repoPath) ? repoPath : Environment.CurrentDirectory;
+                return dbManager.GetOrCreateDb(effectiveRepo);
             })
             .AddSingleton(sp =>
             {
-                var ps  = sp.GetRequiredService<IReadOnlyList<ILanguageParser>>();
-                var buf = new DirtyFileBuffer(repoPath, ps);
-                buf.Refresh();  // warm cache before first tool call
-                return buf;
+                var bufferManager = sp.GetRequiredService<IWorkspaceBufferManager>();
+                var effectiveRepo = !string.IsNullOrWhiteSpace(repoPath) ? repoPath : Environment.CurrentDirectory;
+                return bufferManager.GetOrCreateBuffer(effectiveRepo);
             })
-            .AddSingleton(sp => new ServiceStackLinker(sp.GetRequiredService<CodeGraphDb>()))
             .AddMcpServer()
             .WithStdioServerTransport()
             // Explicit generic registration with AOT-safe JSON options
@@ -59,11 +64,11 @@ public static class McpServer
 
         var host = builder.Build();
 
-        // Eagerly warm the dirty-file buffer BEFORE the host starts accepting connections.
-        // DirtyFileBuffer.Refresh() calls `git status` which can take 2-4s.
-        // Without eager pre-warming, the first tool call that needs it triggers this delay,
-        // and if stdin closes in the meantime the response gets dropped in the race.
-        host.Services.GetRequiredService<DirtyFileBuffer>();
+        if (!string.IsNullOrWhiteSpace(repoPath))
+        {
+            // Eagerly warm the dirty-file buffer BEFORE the host starts accepting connections in bound mode.
+            host.Services.GetRequiredService<DirtyFileBuffer>();
+        }
 
         await host.RunAsync(ct);
     }

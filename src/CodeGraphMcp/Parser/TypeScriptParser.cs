@@ -3,7 +3,7 @@ using TreeSitter;
 
 namespace CodeGraphMcp.Parser;
 
-public sealed class TypeScriptParser : ILanguageParser
+public sealed class TypeScriptParser : JsTsParserBase, ILanguageParser
 {
     public IReadOnlyList<string> FileExtensions => [".ts", ".tsx"];
     public string Language => "typescript";
@@ -48,7 +48,7 @@ public sealed class TypeScriptParser : ILanguageParser
                 foreach (var capture in match.Captures)
                 {
                     var captureName = capture.Name;
-                    if (!captureName.EndsWith(".def")) continue;
+                    if (captureName == null || !captureName.EndsWith(".def")) continue;
 
                     var kind = captureName.Replace(".def", "");
                     var node = capture.Node;
@@ -67,6 +67,7 @@ public sealed class TypeScriptParser : ILanguageParser
                         "function"  => Models.SymbolType.Function,
                         "method"    => Models.SymbolType.Method,
                         "typealias" => Models.SymbolType.TypeAlias,
+                        "namespace" => Models.SymbolType.Class,
                         _           => Models.SymbolType.Class
                     };
 
@@ -80,6 +81,8 @@ public sealed class TypeScriptParser : ILanguageParser
                         EndLine    = (int)node.EndPosition.Row + 1,
                         StartByte  = (int)node.StartIndex,
                         EndByte    = (int)node.EndIndex,
+                        DocComment = ExtractDocComment(node),
+                        IsPartial  = symbolType is Models.SymbolType.Interface || kind == "namespace"
                     });
                 }
             }
@@ -125,7 +128,7 @@ public sealed class TypeScriptParser : ILanguageParser
         {
             foreach (var child in node.NamedChildren)
             {
-                if (child.Type is "identifier" or "property_identifier" or "type_identifier")
+                if (child.Id != IntPtr.Zero && child.Type is "identifier" or "property_identifier" or "type_identifier")
                 {
                     if (!string.IsNullOrWhiteSpace(child.Text))
                     {
@@ -171,15 +174,21 @@ public sealed class TypeScriptParser : ILanguageParser
     {
         foreach (var child in callNode.NamedChildren)
         {
+            if (child.Id == IntPtr.Zero) continue;
+
             if (child.Type == "member_expression")
             {
-                foreach (var memberChild in child.NamedChildren)
+                var memberChildren = child.NamedChildren.ToList();
+                foreach (var memberChild in memberChildren)
                 {
-                    if (memberChild.Type == "property_identifier")
+                    if (memberChild.Id != IntPtr.Zero && memberChild.Type == "property_identifier")
                         return memberChild.Text;
                 }
-                var last = child.NamedChildren.LastOrDefault();
-                if (last.Id != IntPtr.Zero) return last.Text;
+                if (memberChildren.Count > 0)
+                {
+                    var last = memberChildren[^1];
+                    if (last.Id != IntPtr.Zero) return last.Text;
+                }
             }
             if (child.Type is "identifier" or "property_identifier")
             {
@@ -193,7 +202,7 @@ public sealed class TypeScriptParser : ILanguageParser
     {
         foreach (var child in newExpr.NamedChildren)
         {
-            if (child.Type is "identifier" or "type_identifier")
+            if (child.Id != IntPtr.Zero && child.Type is "identifier" or "type_identifier")
                 return child.Text;
         }
         return null;
