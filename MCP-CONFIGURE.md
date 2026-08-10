@@ -14,7 +14,7 @@ dotnet publish src/CodeGraphMcp/CodeGraphMcp.csproj -c Release -o ./publish
 ```
 
 The compiled executable will be located at:
-`C:\path\to\CodeGraphMcp\publish\CodeGraphMcp.exe` (or `dotnet run --project ...` during development).
+`D:\Projects\C#\CodeGraphMcp\publish\CodeGraphMcp.exe` (or `dotnet run --project ...` during development).
 
 ---
 

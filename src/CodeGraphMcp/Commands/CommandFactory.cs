@@ -102,25 +102,28 @@ public static class CommandFactory
         }, symbolArgument, repoOption, dbDirOption, storeLocalOption);
 
         // ── serve ──────────────────────────────────────────────────────────────────
+        var serveRepoArg          = new Argument<DirectoryInfo?>("repo-path", () => null, "Repository path to serve (optional)");
         var serveRepoOption       = new Option<DirectoryInfo?>(new[] { "--repo", "-r" }, "Repository path to serve (optional, defaults to unbound/dynamic target directories)");
         var serveDbDirOption      = new Option<DirectoryInfo?>("--db-dir", "Override SQLite database directory");
         var serveStoreLocalOption = new Option<bool>(new[] { "--store-local", "-l" }, "Use .agent-index/ in repo");
 
         var serveCommand = new Command("serve", "Start the MCP stdio server");
+        serveCommand.AddArgument(serveRepoArg);
         serveCommand.AddOption(serveRepoOption);
         serveCommand.AddOption(serveDbDirOption);
         serveCommand.AddOption(serveStoreLocalOption);
 
         serveCommand.SetHandler(async (context) =>
         {
-            var repo = context.ParseResult.GetValueForOption(serveRepoOption);
-            var dbDir = context.ParseResult.GetValueForOption(serveDbDirOption);
+            var repoArg    = context.ParseResult.GetValueForArgument(serveRepoArg);
+            var repoOpt    = context.ParseResult.GetValueForOption(serveRepoOption);
+            var dbDir      = context.ParseResult.GetValueForOption(serveDbDirOption);
             var storeLocal = context.ParseResult.GetValueForOption(serveStoreLocalOption);
 
-            var repoPath = repo?.FullName;
+            var repoPath = repoArg?.FullName ?? repoOpt?.FullName;
             if (storeLocal && repoPath is null)
             {
-                Console.Error.WriteLine("Warning: --store-local (-l) requires --repo (-r) to locate repository root. Ignoring --store-local for unbound mode.");
+                Console.Error.WriteLine("Warning: --store-local (-l) requires repo-path to locate repository root. Ignoring --store-local for unbound mode.");
             }
 
             var dbPath = repoPath is not null ? StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, repoPath) : dbDir?.FullName;
