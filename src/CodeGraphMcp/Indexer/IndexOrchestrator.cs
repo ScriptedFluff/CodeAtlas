@@ -35,12 +35,15 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
         return map;
     }
 
-    public async Task<IndexResult> IndexAsync(string repoPath, CancellationToken ct = default)
+    public Task<IndexResult> IndexAsync(string repoPath, CancellationToken ct)
+        => IndexAsync(repoPath, noIgnore: false, ct);
+
+    public async Task<IndexResult> IndexAsync(string repoPath, bool noIgnore = false, CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
-        var files = EnumerateFiles(repoPath).ToList();
+        var files = EnumerateFiles(repoPath, noIgnore).ToList();
 
-        logger?.LogInformation("Found {FileCount} files to process in {RepoPath}", files.Count, repoPath);
+        logger?.LogInformation("Found {FileCount} files to process in {RepoPath} (noIgnore: {NoIgnore})", files.Count, repoPath, noIgnore);
 
         int symbolsWritten = 0;
         var fileRefs = new System.Collections.Concurrent.ConcurrentBag<(string RelPath, List<SymbolReference> Refs)>();
@@ -88,9 +91,9 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
         return new IndexResult(files.Count, symbolsWritten, sw.ElapsedMilliseconds);
     }
 
-    private IEnumerable<string> EnumerateFiles(string root)
+    private IEnumerable<string> EnumerateFiles(string root, bool noIgnore = false)
     {
-        var matcher = new GitIgnoreMatcher(root);
+        var matcher = new GitIgnoreMatcher(root, noIgnore);
         var queue = new Queue<string>();
         queue.Enqueue(root);
 
@@ -101,7 +104,10 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
             if (!Directory.Exists(dir)) continue;
 
             // Dynamically load nested .gitignore if present
-            matcher.LoadGitIgnore(dir);
+            if (!noIgnore)
+            {
+                matcher.LoadGitIgnore(dir);
+            }
 
             foreach (var sub in Directory.GetDirectories(dir))
             {
@@ -109,14 +115,14 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
                 if (DefaultIgnoredDirs.Contains(dirName))
                     continue;
 
-                if (!matcher.IsIgnored(sub, isDirectory: true))
+                if (noIgnore || !matcher.IsIgnored(sub, isDirectory: true))
                     queue.Enqueue(sub);
             }
 
             foreach (var file in Directory.GetFiles(dir))
             {
                 var ext = Path.GetExtension(file);
-                if (_extensionMap.ContainsKey(ext) && !matcher.IsIgnored(file, isDirectory: false))
+                if (_extensionMap.ContainsKey(ext) && (noIgnore || !matcher.IsIgnored(file, isDirectory: false)))
                     yield return file;
             }
         }

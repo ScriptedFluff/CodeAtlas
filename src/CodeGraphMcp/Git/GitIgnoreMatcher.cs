@@ -16,10 +16,16 @@ public sealed class GitIgnoreMatcher
     private readonly List<IgnoreRule> _rules = [];
     private readonly HashSet<string> _loadedDirs = new(StringComparer.OrdinalIgnoreCase);
 
-    public GitIgnoreMatcher(string rootPath)
+    public bool NoIgnore { get; set; }
+
+    public GitIgnoreMatcher(string rootPath, bool noIgnore = false)
     {
         _rootPath = Path.GetFullPath(rootPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        LoadGitIgnore(_rootPath);
+        NoIgnore = noIgnore;
+        if (!NoIgnore)
+        {
+            LoadGitIgnore(_rootPath);
+        }
     }
 
     /// <summary>
@@ -27,6 +33,8 @@ public sealed class GitIgnoreMatcher
     /// </summary>
     public void LoadGitIgnore(string dirPath)
     {
+        if (NoIgnore) return;
+
         var fullDirPath = Path.GetFullPath(dirPath);
         if (!_loadedDirs.Add(fullDirPath)) return;
 
@@ -56,7 +64,7 @@ public sealed class GitIgnoreMatcher
     /// </summary>
     public bool IsIgnored(string path, bool isDirectory = false)
     {
-        if (_rules.Count == 0) return false;
+        if (NoIgnore || _rules.Count == 0) return false;
 
         var fullPath = Path.GetFullPath(Path.IsPathRooted(path) ? path : Path.Combine(_rootPath, path));
         if (!fullPath.StartsWith(_rootPath, StringComparison.OrdinalIgnoreCase))

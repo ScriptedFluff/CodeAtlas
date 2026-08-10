@@ -61,4 +61,14 @@ bin/
         Assert.False(matcher.IsIgnored("src/other/service.generated.cs", isDirectory: false));
         Assert.False(matcher.IsIgnored("src/module/service.cs", isDirectory: false));
     }
+
+    [Fact]
+    public void DisablesFilteringWhenNoIgnoreIsTrue()
+    {
+        File.WriteAllText(Path.Combine(_tempDir, ".gitignore"), "*.log\nbin/\n");
+        var matcher = new GitIgnoreMatcher(_tempDir, noIgnore: true);
+
+        Assert.False(matcher.IsIgnored("app.log", isDirectory: false));
+        Assert.False(matcher.IsIgnored("bin/debug/app.dll", isDirectory: false));
+    }
 }

@@ -29,7 +29,10 @@ public sealed class DeltaEngine(
     ///   - "delta" : prior index state exists → re-parses only changed files
     ///   - "noop"  : HEAD matches last_commit_hash → nothing to do
     /// </summary>
-    public async Task<DeltaResult> RunAsync(CancellationToken ct = default)
+    public Task<DeltaResult> RunAsync(CancellationToken ct)
+        => RunAsync(noIgnore: false, ct);
+
+    public async Task<DeltaResult> RunAsync(bool noIgnore = false, CancellationToken ct = default)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
@@ -49,7 +52,7 @@ public sealed class DeltaEngine(
         if (lastHash is null || headHash is null)
         {
             var orchestrator = new Indexer.IndexOrchestrator(db);
-            var result = await orchestrator.IndexAsync(repoPath, ct);
+            var result = await orchestrator.IndexAsync(repoPath, noIgnore, ct);
 
             var finalHash = headHash ?? "unknown";
             db.IndexState.SetIndexState(branch, finalHash, 0);

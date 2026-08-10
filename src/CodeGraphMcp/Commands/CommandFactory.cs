@@ -15,6 +15,7 @@ public static class CommandFactory
         var dbDirOption      = new Option<DirectoryInfo?>("--db-dir", "Override directory for the SQLite database");
         var storeLocalOption = new Option<bool>(new[] { "--store-local", "-l" }, "Store the database inside the repo under .agent-index/");
         var forceFullOption  = new Option<bool>("--force-full", "Skip delta detection and re-index everything");
+        var noIgnoreOption   = new Option<bool>("--no-ignore", "Disable .gitignore rule filtering during indexing");
 
         // ── index ──────────────────────────────────────────────────────────────────
         var indexCommand = new Command("index", "Parse and index a repository into the knowledge graph");
@@ -22,18 +23,20 @@ public static class CommandFactory
         indexCommand.AddOption(dbDirOption);
         indexCommand.AddOption(storeLocalOption);
         indexCommand.AddOption(forceFullOption);
-        indexCommand.SetHandler(async (repo, dbDir, storeLocal, force) =>
+        indexCommand.AddOption(noIgnoreOption);
+        indexCommand.SetHandler(async (repo, dbDir, storeLocal, force, noIgnore) =>
         {
-            var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, repo.FullName);
+            var normRepo = WorkspacePathResolver.NormalizePath(repo.FullName);
+            var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, normRepo);
             using var db = new CodeGraphDb(dbPath);
             db.Migrate();
 
-            if (force || !GitHelpers.IsGitRepo(repo.FullName))
+            if (force || !GitHelpers.IsGitRepo(normRepo))
             {
                 var orchestrator = new IndexOrchestrator(db);
-                var result = await orchestrator.IndexAsync(repo.FullName);
-                var headHash = GitHelpers.GetHeadCommitHash(repo.FullName) ?? "unknown";
-                var branch = GitHelpers.GetCurrentBranch(repo.FullName) ?? "unknown";
+                var result = await orchestrator.IndexAsync(normRepo, noIgnore);
+                var headHash = GitHelpers.GetHeadCommitHash(normRepo) ?? "unknown";
+                var branch = GitHelpers.GetCurrentBranch(normRepo) ?? "unknown";
                 db.IndexState.SetIndexState(branch, headHash, 0);
 
                 Console.WriteLine($"Indexed {result.FilesProcessed} files, {result.SymbolsWritten} symbols ({result.ElapsedMs}ms) [full]");
@@ -41,8 +44,8 @@ public static class CommandFactory
             else
             {
                 var parsers = GetParsers();
-                var delta   = new DeltaEngine(repo.FullName, db, parsers);
-                var result  = await delta.RunAsync();
+                var delta   = new DeltaEngine(normRepo, db, parsers);
+                var result  = await delta.RunAsync(noIgnore);
 
                 Console.WriteLine(result.Mode switch
                 {
@@ -52,7 +55,7 @@ public static class CommandFactory
                     _       => $"Done ({result.ElapsedMs}ms)"
                 });
             }
-        }, repoArgument, dbDirOption, storeLocalOption, forceFullOption);
+        }, repoArgument, dbDirOption, storeLocalOption, forceFullOption, noIgnoreOption);
 
         // ── query ──────────────────────────────────────────────────────────────────
         var symbolArgument = new Argument<string>("symbol-name", "Name of the symbol to look up");

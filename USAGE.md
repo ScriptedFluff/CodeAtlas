@@ -60,6 +60,7 @@ dotnet run --project src/CodeGraphMcp -- index "C:\path\to\your\repository" --st
 | `--store-local` | `-l` | Stores SQLite DB inside `<repo-path>/.agent-index/codegraph.db`. |
 | `--db-dir` | — | Override folder location where SQLite database file is created. |
 | `--force-full` | — | Bypass git delta detection and re-parse/re-index every file. |
+| `--no-ignore` | — | Bypass `.gitignore` rules and index all matching source files. |
 
 ### Incremental Delta Indexing
 - If the repository is a **Git repository**, `CodeGraphMcp` records the HEAD commit hash.
