@@ -1,5 +1,6 @@
 # CodeGraphMcp — Usage Guide
 
+<!-- Updated 2026-08-10 -->
 `CodeGraphMcp` is a local code knowledge graph and indexer engine designed to parse, index, link reference graphs, cross-stack contracts, and query symbol definitions across multiple programming languages (C#, TypeScript, HTML, PowerShell).
 
 ---
