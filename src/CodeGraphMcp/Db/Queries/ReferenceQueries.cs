@@ -60,11 +60,13 @@ public sealed class ReferenceQueries(SqliteConnection connection)
     /// <summary>
     /// Insert references for a file. Resolves caller/target names to symbol IDs
     /// via lookup. Unresolved references are silently skipped.
+    /// Supports scoped resolution with file preference and top-level file fallback.
     /// </summary>
     public void UpsertFileReferences(
         string filePath,
         IReadOnlyList<SymbolReference> references,
-        Func<string, long?> resolveSymbolId)
+        Func<string, string?, long?> resolveSymbolId,
+        Func<string, long?>? getFileSymbolId = null)
     {
         DeleteByFile(filePath);
 
@@ -85,8 +87,10 @@ public sealed class ReferenceQueries(SqliteConnection connection)
 
         foreach (var r in references)
         {
-            var callerId = resolveSymbolId(r.CallerSymbolName);
-            var targetId = resolveSymbolId(r.TargetSymbolName);
+            var callerId = resolveSymbolId(r.CallerSymbolName, filePath)
+                        ?? getFileSymbolId?.Invoke(filePath);
+            var targetId = resolveSymbolId(r.TargetSymbolName, null);
+
             if (callerId is null || targetId is null) continue;
 
             pCallerId.Value   = callerId.Value;

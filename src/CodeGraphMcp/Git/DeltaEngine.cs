@@ -108,7 +108,11 @@ public sealed class DeltaEngine(
                 {
                     var existingCount = db.Symbols.CountByFile(normPath);
                     db.Symbols.UpsertFileDelta(normPath, symbols);
-                    db.References.UpsertFileReferences(normPath, refs, name => db.Symbols.ResolveId(name));
+                    db.References.UpsertFileReferences(
+                        normPath,
+                        refs,
+                        (name, preferredFile) => db.Symbols.ResolveId(name, preferredFile),
+                        path => db.Symbols.GetPrimarySymbolIdForFile(path));
                     Interlocked.Add(ref symbolsDeleted, existingCount);
                     Interlocked.Add(ref symbolsAdded, symbols.Count);
                 }

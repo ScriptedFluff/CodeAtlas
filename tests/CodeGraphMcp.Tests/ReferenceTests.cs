@@ -112,7 +112,11 @@ public class ReferenceDatabaseTests : IDisposable
             new SymbolReference("CallerMethod", "TargetMethod", "Call", "FileA.cs", LineNumber: 7)
         };
 
-        _db.References.UpsertFileReferences("FileA.cs", refs, name => _db.Symbols.ResolveId(name));
+        _db.References.UpsertFileReferences(
+            "FileA.cs",
+            refs,
+            (name, file) => _db.Symbols.ResolveId(name, file),
+            file => _db.Symbols.GetPrimarySymbolIdForFile(file));
 
         // 3. Find callers of TargetMethod
         var callers = _db.References.FindCallers("TargetMethod");
@@ -122,5 +126,46 @@ public class ReferenceDatabaseTests : IDisposable
         Assert.Equal("FileA.cs", callers[0].FilePath);
         Assert.Equal(7, callers[0].LineNumber);
         Assert.Equal("Call", callers[0].ReferenceType);
+    }
+
+    [Fact]
+    public void UpsertFileReferences_PrefersLocalFileSymbol_WhenSameNameExistsInMultipleFiles()
+    {
+        // Two symbols named 'CommonMethod' in FileA.cs and FileB.cs
+        _db.Symbols.UpsertFile("FileA.cs", new[] { new Symbol { SymbolName = "CommonMethod", SymbolType = SymbolType.Method, FilePath = "FileA.cs", StartLine = 1, EndLine = 5, StartByte = 0, EndByte = 10 } });
+        _db.Symbols.UpsertFile("FileB.cs", new[] { new Symbol { SymbolName = "CommonMethod", SymbolType = SymbolType.Method, FilePath = "FileB.cs", StartLine = 1, EndLine = 5, StartByte = 0, EndByte = 10 } });
+        _db.Symbols.UpsertFile("FileC.cs", new[] { new Symbol { SymbolName = "Target", SymbolType = SymbolType.Method, FilePath = "FileC.cs", StartLine = 1, EndLine = 5, StartByte = 0, EndByte = 10 } });
+
+        var refs = new[] { new SymbolReference("CommonMethod", "Target", "Call", "FileB.cs", 3) };
+
+        _db.References.UpsertFileReferences(
+            "FileB.cs",
+            refs,
+            (name, file) => _db.Symbols.ResolveId(name, file),
+            file => _db.Symbols.GetPrimarySymbolIdForFile(file));
+
+        var callers = _db.References.FindCallers("Target");
+        Assert.Single(callers);
+        Assert.Equal("FileB.cs", callers[0].FilePath);
+    }
+
+    [Fact]
+    public void UpsertFileReferences_TopLevelScript_FallsBackToPrimarySymbolForFile()
+    {
+        _db.Symbols.UpsertFile("Program.cs", new[] { new Symbol { SymbolName = "ProgramClass", SymbolType = SymbolType.Class, FilePath = "Program.cs", StartLine = 1, EndLine = 20, StartByte = 0, EndByte = 100 } });
+        _db.Symbols.UpsertFile("Service.cs", new[] { new Symbol { SymbolName = "DoWork", SymbolType = SymbolType.Method, FilePath = "Service.cs", StartLine = 1, EndLine = 5, StartByte = 0, EndByte = 50 } });
+
+        // Reference where CallerSymbolName is "Program" (file name fallback), which doesn't match "ProgramClass" directly by name
+        var refs = new[] { new SymbolReference("Program", "DoWork", "Call", "Program.cs", 10) };
+
+        _db.References.UpsertFileReferences(
+            "Program.cs",
+            refs,
+            (name, file) => _db.Symbols.ResolveId(name, file),
+            file => _db.Symbols.GetPrimarySymbolIdForFile(file));
+
+        var callers = _db.References.FindCallers("DoWork");
+        Assert.Single(callers);
+        Assert.Equal("ProgramClass", callers[0].CallerName);
     }
 }

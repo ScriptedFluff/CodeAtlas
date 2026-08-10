@@ -73,7 +73,11 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
 
         foreach (var (relPath, refs) in fileRefs)
         {
-            db.References.UpsertFileReferences(relPath, refs, name => db.Symbols.ResolveId(name));
+            db.References.UpsertFileReferences(
+                relPath,
+                refs,
+                (name, preferredFile) => db.Symbols.ResolveId(name, preferredFile),
+                path => db.Symbols.GetPrimarySymbolIdForFile(path));
         }
 
         sw.Stop();

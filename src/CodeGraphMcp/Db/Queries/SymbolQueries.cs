@@ -194,16 +194,53 @@ public sealed class SymbolQueries(SqliteConnection connection)
         return result;
     }
 
-    /// <summary>Resolve a symbol name to its ID. Returns null if not found.</summary>
-    public long? ResolveId(string symbolName)
+    /// <summary>
+    /// Resolve a symbol name to its ID, preferring symbols in preferredFilePath if specified.
+    /// Returns null if no symbol with symbolName exists.
+    /// </summary>
+    public long? ResolveId(string symbolName, string? preferredFilePath = null)
+    {
+        using var cmd = connection.CreateCommand();
+
+        if (!string.IsNullOrEmpty(preferredFilePath))
+        {
+            cmd.CommandText = """
+                SELECT id FROM symbols
+                WHERE symbol_name = @name COLLATE NOCASE
+                ORDER BY CASE WHEN file_path = @filePath THEN 0 ELSE 1 END, id
+                LIMIT 1;
+                """;
+            cmd.Parameters.AddWithValue("@name", symbolName);
+            cmd.Parameters.AddWithValue("@filePath", preferredFilePath);
+        }
+        else
+        {
+            cmd.CommandText = """
+                SELECT id FROM symbols
+                WHERE symbol_name = @name COLLATE NOCASE
+                LIMIT 1;
+                """;
+            cmd.Parameters.AddWithValue("@name", symbolName);
+        }
+
+        var result = cmd.ExecuteScalar();
+        return result is DBNull or null ? null : Convert.ToInt64(result);
+    }
+
+    /// <summary>
+    /// Gets the primary (first defined) symbol ID for a file path.
+    /// Used as fallback caller ID for top-level scripts or file-scoped references.
+    /// </summary>
+    public long? GetPrimarySymbolIdForFile(string filePath)
     {
         using var cmd = connection.CreateCommand();
         cmd.CommandText = """
             SELECT id FROM symbols
-            WHERE symbol_name = @name COLLATE NOCASE
+            WHERE file_path = @filePath
+            ORDER BY start_line
             LIMIT 1;
             """;
-        cmd.Parameters.AddWithValue("@name", symbolName);
+        cmd.Parameters.AddWithValue("@filePath", filePath);
         var result = cmd.ExecuteScalar();
         return result is DBNull or null ? null : Convert.ToInt64(result);
     }
