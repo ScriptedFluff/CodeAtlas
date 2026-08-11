@@ -30,9 +30,12 @@ public sealed class DeltaEngine(
     ///   - "noop"  : HEAD matches last_commit_hash → nothing to do
     /// </summary>
     public Task<DeltaResult> RunAsync(CancellationToken ct)
-        => RunAsync(noIgnore: false, ct);
+        => RunAsync(noIgnore: false, verbose: false, ct);
 
-    public async Task<DeltaResult> RunAsync(bool noIgnore = false, CancellationToken ct = default)
+    public Task<DeltaResult> RunAsync(bool noIgnore, CancellationToken ct)
+        => RunAsync(noIgnore: noIgnore, verbose: false, ct);
+
+    public async Task<DeltaResult> RunAsync(bool noIgnore = false, bool verbose = false, CancellationToken ct = default)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
@@ -52,7 +55,7 @@ public sealed class DeltaEngine(
         if (lastHash is null || headHash is null)
         {
             var orchestrator = new Indexer.IndexOrchestrator(db);
-            var result = await orchestrator.IndexAsync(repoPath, noIgnore, ct);
+            var result = await orchestrator.IndexAsync(repoPath, noIgnore, verbose, ct);
 
             var finalHash = headHash ?? "unknown";
             db.IndexState.SetIndexState(branch, finalHash, 0);

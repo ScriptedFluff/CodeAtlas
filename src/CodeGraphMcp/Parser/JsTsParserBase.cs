@@ -40,12 +40,31 @@ public abstract class JsTsParserBase
         if (node.Id == IntPtr.Zero) return null;
         try
         {
-            var prev = node.PreviousNamedSibling;
-            if (prev.Id == IntPtr.Zero || prev.Type is null || !string.Equals(prev.Type, "comment", StringComparison.Ordinal))
-                return null;
-            var text = prev.Text;
-            if (string.IsNullOrWhiteSpace(text)) return null;
-            return text.TrimStart('/', '*', ' ');
+            var comments = new List<string>();
+            var prev = node.PreviousSibling;
+
+            while (prev.Id != IntPtr.Zero && prev.Type is not null && (prev.Type == "comment" || prev.Type == "single_line_comment" || prev.Type == "multiline_comment"))
+            {
+                var text = prev.Text;
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    comments.Insert(0, text.TrimStart('/', '*', ' '));
+                }
+                prev = prev.PreviousSibling;
+            }
+
+            if (comments.Count == 0)
+            {
+                var prevNamed = node.PreviousNamedSibling;
+                if (prevNamed.Id != IntPtr.Zero && prevNamed.Type is not null && (prevNamed.Type == "comment" || prevNamed.Type == "single_line_comment" || prevNamed.Type == "multiline_comment"))
+                {
+                    var text = prevNamed.Text;
+                    if (!string.IsNullOrWhiteSpace(text))
+                        comments.Add(text.TrimStart('/', '*', ' '));
+                }
+            }
+
+            return comments.Count > 0 ? string.Join("\n", comments) : null;
         }
         catch
         {

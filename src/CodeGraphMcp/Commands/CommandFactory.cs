@@ -16,6 +16,7 @@ public static class CommandFactory
         var storeLocalOption = new Option<bool>(new[] { "--store-local", "-l" }, "Store the database inside the repo under .agent-index/");
         var forceFullOption  = new Option<bool>("--force-full", "Skip delta detection and re-index everything");
         var noIgnoreOption   = new Option<bool>("--no-ignore", "Disable .gitignore rule filtering during indexing");
+        var verboseOption    = new Option<bool>(new[] { "--verbose", "-v" }, "Enable verbose progress and detailed console output");
 
         // ── index ──────────────────────────────────────────────────────────────────
         var indexCommand = new Command("index", "Parse and index a repository into the knowledge graph");
@@ -24,7 +25,8 @@ public static class CommandFactory
         indexCommand.AddOption(storeLocalOption);
         indexCommand.AddOption(forceFullOption);
         indexCommand.AddOption(noIgnoreOption);
-        indexCommand.SetHandler(async (repo, dbDir, storeLocal, force, noIgnore) =>
+        indexCommand.AddOption(verboseOption);
+        indexCommand.SetHandler(async (repo, dbDir, storeLocal, force, noIgnore, verbose) =>
         {
             var normRepo = WorkspacePathResolver.NormalizePath(repo.FullName);
             var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, normRepo);
@@ -34,7 +36,7 @@ public static class CommandFactory
             if (force || !GitHelpers.IsGitRepo(normRepo))
             {
                 var orchestrator = new IndexOrchestrator(db);
-                var result = await orchestrator.IndexAsync(normRepo, noIgnore);
+                var result = await orchestrator.IndexAsync(normRepo, noIgnore, verbose);
                 var headHash = GitHelpers.GetHeadCommitHash(normRepo) ?? "unknown";
                 var branch = GitHelpers.GetCurrentBranch(normRepo) ?? "unknown";
                 db.IndexState.SetIndexState(branch, headHash, 0);
@@ -45,7 +47,7 @@ public static class CommandFactory
             {
                 var parsers = GetParsers();
                 var delta   = new DeltaEngine(normRepo, db, parsers);
-                var result  = await delta.RunAsync(noIgnore);
+                var result  = await delta.RunAsync(noIgnore, verbose);
 
                 Console.WriteLine(result.Mode switch
                 {
@@ -55,7 +57,7 @@ public static class CommandFactory
                     _       => $"Done ({result.ElapsedMs}ms)"
                 });
             }
-        }, repoArgument, dbDirOption, storeLocalOption, forceFullOption, noIgnoreOption);
+        }, repoArgument, dbDirOption, storeLocalOption, forceFullOption, noIgnoreOption, verboseOption);
 
         // ── query ──────────────────────────────────────────────────────────────────
         var symbolArgument = new Argument<string>("symbol-name", "Name of the symbol to look up");

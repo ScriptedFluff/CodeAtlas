@@ -36,9 +36,12 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
     }
 
     public Task<IndexResult> IndexAsync(string repoPath, CancellationToken ct)
-        => IndexAsync(repoPath, noIgnore: false, ct);
+        => IndexAsync(repoPath, noIgnore: false, verbose: false, ct);
 
-    public async Task<IndexResult> IndexAsync(string repoPath, bool noIgnore = false, CancellationToken ct = default)
+    public Task<IndexResult> IndexAsync(string repoPath, bool noIgnore, CancellationToken ct)
+        => IndexAsync(repoPath, noIgnore: noIgnore, verbose: false, ct);
+
+    public async Task<IndexResult> IndexAsync(string repoPath, bool noIgnore = false, bool verbose = false, CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
         var files = EnumerateFiles(repoPath, noIgnore).ToList();
@@ -46,6 +49,8 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
         logger?.LogInformation("Found {FileCount} files to process in {RepoPath} (noIgnore: {NoIgnore})", files.Count, repoPath, noIgnore);
 
         int symbolsWritten = 0;
+        int parsedFileCount = 0;
+        int totalFiles = files.Count;
         var fileRefs = new System.Collections.Concurrent.ConcurrentBag<(string RelPath, List<SymbolReference> Refs)>();
 
         await Parallel.ForEachAsync(files, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = ct }, async (filePath, ct) =>
@@ -59,6 +64,12 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
                 var relPath = WorkspacePathNormalizer.NormalizeRelativePath(repoPath, filePath);
                 var symbols = parser.Parse(relPath, source).ToList();
                 var refs = parser.ParseReferences(relPath, source).ToList();
+
+                var currentIdx = Interlocked.Increment(ref parsedFileCount);
+                if (verbose)
+                {
+                    Console.WriteLine($"[{currentIdx} of {totalFiles}] Parsed {relPath} ({symbols.Count} symbols, {refs.Count} refs)");
+                }
 
                 lock (db)
                 {
@@ -77,8 +88,16 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
             }
         });
 
+        int refIdx = 0;
+        int totalRefFiles = fileRefs.Count;
         foreach (var (relPath, refs) in fileRefs)
         {
+            refIdx++;
+            if (verbose)
+            {
+                Console.WriteLine($"{refIdx} of {totalRefFiles}: {relPath} ({refs.Count} refs)");
+            }
+
             db.References.UpsertFileReferences(
                 relPath,
                 refs,
