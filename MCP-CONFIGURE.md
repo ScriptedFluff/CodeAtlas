@@ -166,3 +166,43 @@ Once connected, AI assistants gain access to these 5 tools:
   CodeGraphMcp.exe index "C:\Projects\TargetApp" --store-local
   ```
 - **Database Locks:** `CodeGraphMcp` uses SQLite in Write-Ahead Logging (`WAL`) mode with read-only connection pooling during queries to prevent database locking errors.
+
+---
+
+## 7. Local Inter-Agent Relay Service (AGY ↔ Copilot)
+
+`CodeGraphMcp` includes a zero-installer, user-level PowerShell background relay daemon located in `./scripts/relay/`. This service allows **AGY (Antigravity)** and **GitHub Copilot** to exchange messages and context directly over a local HTTP endpoint without triggering IDE workspace permission prompts or requiring local Administrator elevation.
+
+### Architecture
+- **Daemon script:** [RelayService.ps1](file:///d:/Projects/C%23/CodeGraphMcp/scripts/relay/RelayService.ps1) — High-performance `System.Net.HttpListener` on `http://localhost:9123/`.
+- **Zero-flash launcher:** [RunHidden.vbs](file:///d:/Projects/C%23/CodeGraphMcp/scripts/relay/RunHidden.vbs) — VBScript launcher preventing console window pop-up flashes during startup.
+- **Installer script:** [Install-RelayService.ps1](file:///d:/Projects/C%23/CodeGraphMcp/scripts/relay/Install-RelayService.ps1) — Registers a user logon startup shortcut (`CodeGraphRelay.lnk`) in `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\`.
+- **Uninstaller script:** [Uninstall-RelayService.ps1](file:///d:/Projects/C%23/CodeGraphMcp/scripts/relay/Uninstall-RelayService.ps1) — Stops active daemon processes and removes startup shortcuts.
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/health` | `GET` | Returns status, uptime, and depth of targeted queues (`agy`, `copilot`, `broadcast`). |
+| `/send` | `POST` | Enqueues a message payload. Accepts optional JSON property `"to": "agy"` or `"to": "copilot"`. |
+| `/receive` | `GET` | Dequeues incoming messages for a specific client (`?client=agy` or `?client=copilot`). |
+
+### Setup & Usage
+
+```powershell
+# Install and start relay daemon
+.\scripts\relay\Install-RelayService.ps1
+
+# Test health check
+Invoke-RestMethod -Uri "http://localhost:9123/health"
+
+# Send targeted message to Copilot
+Invoke-RestMethod -Uri "http://localhost:9123/send" -Method POST -Body '{"to":"copilot","sender":"AGY","msg":"hello"}' -ContentType "application/json"
+
+# Receive targeted message as Copilot
+Invoke-RestMethod -Uri "http://localhost:9123/receive?client=copilot"
+
+# Uninstall relay service
+.\scripts\relay\Uninstall-RelayService.ps1
+```
+
