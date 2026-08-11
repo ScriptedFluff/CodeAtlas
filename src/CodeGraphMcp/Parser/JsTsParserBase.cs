@@ -38,27 +38,28 @@ public abstract class JsTsParserBase
     protected static string? ExtractDocComment(Node node)
     {
         if (node.Id == IntPtr.Zero) return null;
+
         try
         {
             var comments = new List<string>();
             var prev = node.PreviousSibling;
 
-            while (prev.Id != IntPtr.Zero && prev.Type is not null && (prev.Type == "comment" || prev.Type == "single_line_comment" || prev.Type == "multiline_comment"))
+            while (prev is { Id: not 0 } p && p.Type is "comment" or "single_line_comment" or "multiline_comment")
             {
-                var text = prev.Text;
+                var text = p.Text;
                 if (!string.IsNullOrWhiteSpace(text))
                 {
                     comments.Insert(0, text.TrimStart('/', '*', ' '));
                 }
-                prev = prev.PreviousSibling;
+                prev = p.PreviousSibling;
             }
 
             if (comments.Count == 0)
             {
                 var prevNamed = node.PreviousNamedSibling;
-                if (prevNamed.Id != IntPtr.Zero && prevNamed.Type is not null && (prevNamed.Type == "comment" || prevNamed.Type == "single_line_comment" || prevNamed.Type == "multiline_comment"))
+                if (prevNamed is { Id: not 0 } pn && pn.Type is "comment" or "single_line_comment" or "multiline_comment")
                 {
-                    var text = prevNamed.Text;
+                    var text = pn.Text;
                     if (!string.IsNullOrWhiteSpace(text))
                         comments.Add(text.TrimStart('/', '*', ' '));
                 }
