@@ -49,15 +49,20 @@ public static class CommandFactory
                 var delta   = new DeltaEngine(normRepo, db, parsers);
                 var result  = await delta.RunAsync(noIgnore, verbose);
 
+                var seedCommitInfo = result.SeedCommitHash is { Length: >= 7 } h ? $" (commit {h[..7]})" : "";
+                var seedInfo = result.SeedSourcePath is not null ? $"Seeded index from '{result.SeedSourcePath}'{seedCommitInfo}. " : "";
+
                 Console.WriteLine(result.Mode switch
                 {
-                    "noop"  => $"Nothing to index — HEAD unchanged ({result.ElapsedMs}ms) [noop]",
-                    "full"  => $"Indexed {result.FilesReindexed} files, {result.SymbolsAdded} symbols ({result.ElapsedMs}ms) [full]",
-                    "delta" => $"{result.FilesChanged} changed, {result.FilesReindexed} re-indexed, {result.SymbolsAdded} symbols added ({result.ElapsedMs}ms) [delta]",
-                    _       => $"Done ({result.ElapsedMs}ms)"
+                    "noop"         => $"Nothing to index — HEAD unchanged ({result.ElapsedMs}ms) [noop]",
+                    "full"         => $"Indexed {result.FilesReindexed} files, {result.SymbolsAdded} symbols ({result.ElapsedMs}ms) [full]",
+                    "delta"        => $"{result.FilesChanged} changed, {result.FilesReindexed} re-indexed, {result.SymbolsAdded} symbols added ({result.ElapsedMs}ms) [delta]",
+                    "seeded-delta" => $"{seedInfo}{result.FilesChanged} changed, {result.FilesReindexed} re-indexed, {result.SymbolsAdded} symbols added ({result.ElapsedMs}ms) [seeded-delta]",
+                    _              => $"{seedInfo}Done ({result.ElapsedMs}ms)"
                 });
             }
         }, repoArgument, dbDirOption, storeLocalOption, forceFullOption, noIgnoreOption, verboseOption);
+
 
         // ── query ──────────────────────────────────────────────────────────────────
         var symbolArgument = new Argument<string>("symbol-name", "Name of the symbol to look up");

@@ -14,8 +14,11 @@ public static class StorageConfig
     /// </summary>
     public static string ResolveDbPath(string? dbDir, bool storeLocal, string repoPath)
     {
-        // Normalise so the hash is stable regardless of trailing slashes
-        var normalisedRepo = Path.GetFullPath(repoPath).TrimEnd(Path.DirectorySeparatorChar);
+        // Normalise so the hash is stable regardless of trailing slashes or letter casing
+        var normalisedRepo = Path.GetFullPath(repoPath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .ToLowerInvariant();
+
 
         if (dbDir is not null)
         {

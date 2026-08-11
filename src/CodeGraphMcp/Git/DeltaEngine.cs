@@ -1,4 +1,5 @@
 using CodeGraphMcp.Db;
+using CodeGraphMcp.Models;
 using CodeGraphMcp.Parser;
 
 namespace CodeGraphMcp.Git;
@@ -20,14 +21,17 @@ public sealed class DeltaEngine(
         int SymbolsDeleted,
         int SymbolsAdded,
         long ElapsedMs,
-        string Mode    // "full" | "delta" | "noop"
+        string Mode,           // "full" | "delta" | "noop" | "seeded-delta"
+        string? SeedSourcePath = null,
+        string? SeedCommitHash = null
     );
 
     /// <summary>
     /// Runs the appropriate indexing mode:
-    ///   - "full"  : no prior index state → delegates to IndexOrchestrator
-    ///   - "delta" : prior index state exists → re-parses only changed files
-    ///   - "noop"  : HEAD matches last_commit_hash → nothing to do
+    ///   - "full"         : no prior index state → delegates to IndexOrchestrator
+    ///   - "delta"        : prior index state exists → re-parses only changed files
+    ///   - "seeded-delta" : seeded from existing worktree DB → re-parses delta files
+    ///   - "noop"         : HEAD matches last_commit_hash → nothing to do
     /// </summary>
     public Task<DeltaResult> RunAsync(CancellationToken ct)
         => RunAsync(noIgnore: false, verbose: false, ct);
@@ -50,6 +54,24 @@ public sealed class DeltaEngine(
             sw.Stop();
             return new DeltaResult(0, 0, 0, 0, sw.ElapsedMilliseconds, "noop");
         }
+
+        string mode = "delta";
+        string? seedSourcePath = null;
+        string? seedCommitHash = null;
+
+        if (lastHash is null && headHash is not null)
+        {
+            var seedResult = DbSeedingService.TrySeedDatabase(repoPath, db);
+            if (seedResult is not null)
+
+            {
+                lastHash = seedResult.SourceCommitHash;
+                seedSourcePath = seedResult.SourceDbPath;
+                seedCommitHash = seedResult.SourceCommitHash;
+                mode = "seeded-delta";
+            }
+        }
+
 
         // ── FULL (first run, detached HEAD, or empty repo) ────────────────────
         if (lastHash is null || headHash is null)
@@ -80,6 +102,10 @@ public sealed class DeltaEngine(
         int symbolsAdded   = 0;
         int reindexed      = 0;
 
+        var fileSymbols = new System.Collections.Concurrent.ConcurrentBag<(string FilePath, IReadOnlyList<Symbol> Symbols)>();
+        var fileRefs = new System.Collections.Concurrent.ConcurrentBag<(string FilePath, IReadOnlyList<SymbolReference> Refs)>();
+
+
         await Parallel.ForEachAsync(changedFiles, new ParallelOptions
         {
             MaxDegreeOfParallelism = Environment.ProcessorCount,
@@ -107,20 +133,17 @@ public sealed class DeltaEngine(
             try
             {
                 var source  = await File.ReadAllTextAsync(fullPath, token);
-                var symbols = parser.Parse(normPath, source).ToList();
-                var refs    = parser.ParseReferences(normPath, source).ToList();
+                var parseResult = parser.ParseFile(normPath, source);
 
-                lock (db)
+                if (parseResult.Symbols.Count > 0)
                 {
-                    var existingCount = db.Symbols.CountByFile(normPath);
-                    db.Symbols.UpsertFileDelta(normPath, symbols);
-                    db.References.UpsertFileReferences(
-                        normPath,
-                        refs,
-                        (name, preferredFile) => db.Symbols.ResolveId(name, preferredFile),
-                        path => db.Symbols.GetPrimarySymbolIdForFile(path));
-                    Interlocked.Add(ref symbolsDeleted, existingCount);
-                    Interlocked.Add(ref symbolsAdded, symbols.Count);
+                    fileSymbols.Add((normPath, parseResult.Symbols));
+                    Interlocked.Add(ref symbolsAdded, parseResult.Symbols.Count);
+                }
+
+                if (parseResult.References.Count > 0)
+                {
+                    fileRefs.Add((normPath, parseResult.References));
                 }
 
                 Interlocked.Increment(ref reindexed);
@@ -131,14 +154,25 @@ public sealed class DeltaEngine(
             }
         });
 
-        db.IndexState.SetIndexState(branch, headHash, 0);
+        var symbolsList = fileSymbols.ToList();
+        var refsList = fileRefs.ToList();
+
+        lock (db)
+        {
+            var cache = db.Symbols.UpsertSymbolsBatch(symbolsList);
+            db.References.UpsertReferencesBatch(refsList, cache);
+            db.IndexState.SetIndexState(branch, headHash, 0);
+        }
+
         sw.Stop();
 
         return new DeltaResult(
             changedFiles.Count, reindexed,
             symbolsDeleted, symbolsAdded,
-            sw.ElapsedMilliseconds, "delta");
+            sw.ElapsedMilliseconds, mode,
+            seedSourcePath, seedCommitHash);
     }
+
 
     private static Dictionary<string, ILanguageParser> BuildMap(IReadOnlyList<ILanguageParser> parsers)
     {

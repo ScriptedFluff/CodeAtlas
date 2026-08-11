@@ -44,71 +44,78 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
     public async Task<IndexResult> IndexAsync(string repoPath, bool noIgnore = false, bool verbose = false, CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
+
+        if (!Directory.Exists(repoPath))
+        {
+            Console.WriteLine($"[IndexOrchestrator] Warning: Directory '{repoPath}' does not exist.");
+            return new IndexResult(0, 0, 0);
+        }
+
         var files = EnumerateFiles(repoPath, noIgnore).ToList();
 
         logger?.LogInformation("Found {FileCount} files to process in {RepoPath} (noIgnore: {NoIgnore})", files.Count, repoPath, noIgnore);
 
+
+        const int BatchSize = 2500;
         int symbolsWritten = 0;
         int parsedFileCount = 0;
         int totalFiles = files.Count;
-        var fileRefs = new System.Collections.Concurrent.ConcurrentBag<(string RelPath, List<SymbolReference> Refs)>();
 
-        await Parallel.ForEachAsync(files, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = ct }, async (filePath, ct) =>
+        foreach (var chunk in files.Chunk(BatchSize))
         {
-            var ext = Path.GetExtension(filePath);
-            if (!_extensionMap.TryGetValue(ext, out var parser)) return;
+            var chunkSymbols = new System.Collections.Concurrent.ConcurrentBag<(string RelPath, IReadOnlyList<Symbol> Symbols)>();
+            var chunkRefs = new System.Collections.Concurrent.ConcurrentBag<(string RelPath, IReadOnlyList<SymbolReference> Refs)>();
 
-            try
+            await Parallel.ForEachAsync(chunk, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = ct }, async (filePath, token) =>
             {
-                var source = await File.ReadAllTextAsync(filePath, ct);
-                var relPath = WorkspacePathNormalizer.NormalizeRelativePath(repoPath, filePath);
-                var symbols = parser.Parse(relPath, source).ToList();
-                var refs = parser.ParseReferences(relPath, source).ToList();
+                var ext = Path.GetExtension(filePath);
+                if (!_extensionMap.TryGetValue(ext, out var parser)) return;
 
-                var currentIdx = Interlocked.Increment(ref parsedFileCount);
-                if (verbose)
+                try
                 {
-                    Console.WriteLine($"[{currentIdx} of {totalFiles}] Parsed {relPath} ({symbols.Count} symbols, {refs.Count} refs)");
-                }
+                    var source = await File.ReadAllTextAsync(filePath, token);
+                    var relPath = WorkspacePathNormalizer.NormalizeRelativePath(repoPath, filePath);
+                    var parseResult = parser.ParseFile(relPath, source);
 
-                lock (db)
-                {
-                    db.Symbols.UpsertFile(relPath, symbols);
-                    Interlocked.Add(ref symbolsWritten, symbols.Count);
-                }
+                    var currentIdx = Interlocked.Increment(ref parsedFileCount);
+                    if (verbose)
+                    {
+                        Console.WriteLine($"[{currentIdx} of {totalFiles}] Parsed {relPath} ({parseResult.Symbols.Count} symbols, {parseResult.References.Count} refs)");
+                    }
 
-                if (refs.Count > 0)
-                {
-                    fileRefs.Add((relPath, refs));
+                    if (parseResult.Symbols.Count > 0)
+                    {
+                        chunkSymbols.Add((relPath, parseResult.Symbols));
+                        Interlocked.Add(ref symbolsWritten, parseResult.Symbols.Count);
+                    }
+
+                    if (parseResult.References.Count > 0)
+                    {
+                        chunkRefs.Add((relPath, parseResult.References));
+                    }
                 }
-            }
-            catch (Exception ex)
+                catch (Exception ex)
+                {
+                    logger?.LogWarning(ex, "Failed to parse {FilePath} — skipping", filePath);
+                }
+            });
+
+            var symbolsList = chunkSymbols.ToList();
+            var refsList = chunkRefs.ToList();
+
+            lock (db)
             {
-                logger?.LogWarning(ex, "Failed to parse {FilePath} — skipping", filePath);
+                var cache = db.Symbols.UpsertSymbolsBatch(symbolsList);
+                db.References.UpsertReferencesBatch(refsList, cache);
             }
-        });
-
-        int refIdx = 0;
-        int totalRefFiles = fileRefs.Count;
-        foreach (var (relPath, refs) in fileRefs)
-        {
-            refIdx++;
-            if (verbose)
-            {
-                Console.WriteLine($"{refIdx} of {totalRefFiles}: {relPath} ({refs.Count} refs)");
-            }
-
-            db.References.UpsertFileReferences(
-                relPath,
-                refs,
-                (name, preferredFile) => db.Symbols.ResolveId(name, preferredFile),
-                path => db.Symbols.GetPrimarySymbolIdForFile(path));
         }
+
 
         sw.Stop();
         logger?.LogInformation("Indexed {Symbols} symbols in {Ms}ms", symbolsWritten, sw.ElapsedMilliseconds);
         return new IndexResult(files.Count, symbolsWritten, sw.ElapsedMilliseconds);
     }
+
 
     private IEnumerable<string> EnumerateFiles(string root, bool noIgnore = false)
     {

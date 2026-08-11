@@ -9,6 +9,7 @@ public sealed class TypeScriptParser : JsTsParserBase, ILanguageParser
     public string Language => "typescript";
 
     private static readonly TreeSitter.Language TsLanguage = new("tree-sitter-typescript", "tree_sitter_typescript");
+    private static readonly ThreadLocal<TreeSitter.Parser> ThreadParser = new(() => new TreeSitter.Parser());
 
     private const string QueryString = """
         (interface_declaration
@@ -27,17 +28,19 @@ public sealed class TypeScriptParser : JsTsParserBase, ILanguageParser
             name: (type_identifier) @typealias.name) @typealias.def
         """;
 
-    public IEnumerable<Symbol> Parse(string filePath, string source)
+
+    public FileParseResult ParseFile(string filePath, string source)
     {
         var symbols = new List<Symbol>();
+        var refs = new List<SymbolReference>();
         try
         {
-            using var parser = new TreeSitter.Parser();
+            var parser = ThreadParser.Value!;
             parser.Language = TsLanguage;
 
             using var tree = parser.Parse(source);
             if (tree == null || tree.RootNode.Id == IntPtr.Zero)
-                return symbols;
+                return new FileParseResult(symbols, refs);
 
             using var query = new Query(TsLanguage, QueryString);
             using var cursor = new QueryCursor();
@@ -86,26 +89,6 @@ public sealed class TypeScriptParser : JsTsParserBase, ILanguageParser
                     });
                 }
             }
-        }
-        catch
-        {
-            // Catch parser exception gracefully per ILanguageParser contract
-        }
-
-        return symbols;
-    }
-
-    public IEnumerable<SymbolReference> ParseReferences(string filePath, string source)
-    {
-        var refs = new List<SymbolReference>();
-        try
-        {
-            using var parser = new TreeSitter.Parser();
-            parser.Language = TsLanguage;
-
-            using var tree = parser.Parse(source);
-            if (tree == null || tree.RootNode.Id == IntPtr.Zero)
-                return refs;
 
             WalkForReferences(tree.RootNode, filePath, refs, enclosingSymbol: null);
         }
@@ -114,8 +97,15 @@ public sealed class TypeScriptParser : JsTsParserBase, ILanguageParser
             // Catch parser exception gracefully per ILanguageParser contract
         }
 
-        return refs;
+        return new FileParseResult(symbols, refs);
     }
+
+    public IEnumerable<Symbol> Parse(string filePath, string source)
+        => ParseFile(filePath, source).Symbols;
+
+    public IEnumerable<SymbolReference> ParseReferences(string filePath, string source)
+        => ParseFile(filePath, source).References;
+
 
     private static void WalkForReferences(Node node, string filePath, List<SymbolReference> refs, string? enclosingSymbol)
     {

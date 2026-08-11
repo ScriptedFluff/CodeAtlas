@@ -15,6 +15,15 @@ public static class GitHelpers
     public static string? GetCurrentBranch(string repoPath) =>
         RunGit(repoPath, "rev-parse --abbrev-ref HEAD")?.Trim();
 
+    /// <summary>Checks if a commit hash exists in the local git object database.</summary>
+    public static bool CommitExists(string repoPath, string commitHash)
+    {
+        if (string.IsNullOrWhiteSpace(commitHash)) return false;
+        var res = RunGit(repoPath, $"cat-file -t {commitHash}");
+        return res is not null && string.Equals(res.Trim(), "commit", StringComparison.OrdinalIgnoreCase);
+    }
+
+
     /// <summary>
     /// Returns relative file paths that changed between sinceCommit and HEAD.
     /// Includes renames, modifications, and deletions.

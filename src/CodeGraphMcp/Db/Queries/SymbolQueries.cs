@@ -97,6 +97,79 @@ public sealed class SymbolQueries(SqliteConnection connection)
         UpsertFile(filePath, symbols);
     }
 
+    /// <summary>
+    /// Bulk inserts symbols for multiple files within a single transaction
+    /// and populates/returns a SymbolLookupCache.
+    /// </summary>
+    public SymbolLookupCache UpsertSymbolsBatch(IReadOnlyList<(string FilePath, IReadOnlyList<Symbol> Symbols)> fileSymbolsBatch)
+    {
+        var cache = new SymbolLookupCache();
+        using var tx = connection.BeginTransaction();
+
+        using var delete = connection.CreateCommand();
+        delete.Transaction = tx;
+        delete.CommandText = "DELETE FROM symbols WHERE file_path = @filePath;";
+        var pDelPath = delete.Parameters.Add("@filePath", SqliteType.Text);
+
+        foreach (var (filePath, _) in fileSymbolsBatch)
+        {
+            pDelPath.Value = filePath;
+            delete.ExecuteNonQuery();
+        }
+
+        using var insert = connection.CreateCommand();
+        insert.Transaction = tx;
+        insert.CommandText = """
+            INSERT INTO symbols
+                (class_name, symbol_type, symbol_name, language, file_path,
+                 start_line, end_line, start_byte, end_byte, signature, doc_comment, is_partial)
+            VALUES
+                (@className, @symbolType, @symbolName, @language, @filePath,
+                 @startLine, @endLine, @startByte, @endByte, @signature, @docComment, @isPartial)
+            RETURNING id;
+            """;
+
+        var pClassName  = insert.Parameters.Add("@className",  SqliteType.Text);
+        var pSymbolType = insert.Parameters.Add("@symbolType", SqliteType.Text);
+        var pSymbolName = insert.Parameters.Add("@symbolName", SqliteType.Text);
+        var pLanguage   = insert.Parameters.Add("@language",   SqliteType.Text);
+        var pFilePath   = insert.Parameters.Add("@filePath",   SqliteType.Text);
+        var pStartLine  = insert.Parameters.Add("@startLine",  SqliteType.Integer);
+        var pEndLine    = insert.Parameters.Add("@endLine",    SqliteType.Integer);
+        var pStartByte  = insert.Parameters.Add("@startByte",  SqliteType.Integer);
+        var pEndByte    = insert.Parameters.Add("@endByte",    SqliteType.Integer);
+        var pSignature  = insert.Parameters.Add("@signature",  SqliteType.Text);
+        var pDocComment = insert.Parameters.Add("@docComment", SqliteType.Text);
+        var pIsPartial  = insert.Parameters.Add("@isPartial",  SqliteType.Integer);
+
+        foreach (var (filePath, symbols) in fileSymbolsBatch)
+        {
+            foreach (var sym in symbols)
+            {
+                pClassName.Value  = (object?)sym.ClassName  ?? DBNull.Value;
+                pSymbolType.Value = sym.SymbolType.ToString();
+                pSymbolName.Value = sym.SymbolName;
+                pLanguage.Value   = sym.Language ?? "unknown";
+                pFilePath.Value   = filePath;
+                pStartLine.Value  = sym.StartLine;
+                pEndLine.Value    = sym.EndLine;
+                pStartByte.Value  = sym.StartByte;
+                pEndByte.Value    = sym.EndByte;
+                pSignature.Value  = (object?)sym.Signature  ?? DBNull.Value;
+                pDocComment.Value = (object?)sym.DocComment ?? DBNull.Value;
+                pIsPartial.Value  = sym.IsPartial ? 1 : 0;
+
+                var id = Convert.ToInt64(insert.ExecuteScalar());
+                sym.Id = id;
+                cache.Add(id, sym.SymbolName, filePath, sym.StartLine);
+            }
+        }
+
+        tx.Commit();
+        return cache;
+    }
+
+
     /// <summary>Find symbols by name (exact or substring match, case-insensitive).</summary>
     public IReadOnlyList<Symbol> FindByName(string symbolName)
     {

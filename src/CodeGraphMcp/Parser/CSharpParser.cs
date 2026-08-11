@@ -10,18 +10,20 @@ public sealed class CSharpParser : ILanguageParser
     public string Language => "csharp";
 
     private static readonly TreeSitter.Language CSharpLanguage = new("tree-sitter-c-sharp", "tree_sitter_c_sharp");
+    private static readonly ThreadLocal<TreeSitter.Parser> ThreadParser = new(() => new TreeSitter.Parser());
 
-    public IEnumerable<Symbol> Parse(string filePath, string source)
+    public FileParseResult ParseFile(string filePath, string source)
     {
         var symbols = new List<Symbol>();
+        var refs = new List<SymbolReference>();
         try
         {
-            using var parser = new TreeSitter.Parser();
+            var parser = ThreadParser.Value!;
             parser.Language = CSharpLanguage;
 
             using var tree = parser.Parse(source);
             if (tree == null || tree.RootNode.Id == IntPtr.Zero)
-                return symbols;
+                return new FileParseResult(symbols, refs);
 
             string? fileNamespace = null;
 
@@ -40,36 +42,23 @@ public sealed class CSharpParser : ILanguageParser
                     TraverseNode(node, filePath, symbols, fileNamespace, currentClass: null);
                 }
             }
+
+            WalkForReferences(tree.RootNode, filePath, refs, enclosingSymbol: null);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[CSharpParser Error] {ex}");
         }
 
-        return symbols;
+        return new FileParseResult(symbols, refs);
     }
+
+    public IEnumerable<Symbol> Parse(string filePath, string source)
+        => ParseFile(filePath, source).Symbols;
 
     public IEnumerable<SymbolReference> ParseReferences(string filePath, string source)
-    {
-        var refs = new List<SymbolReference>();
-        try
-        {
-            using var parser = new TreeSitter.Parser();
-            parser.Language = CSharpLanguage;
+        => ParseFile(filePath, source).References;
 
-            using var tree = parser.Parse(source);
-            if (tree == null || tree.RootNode.Id == IntPtr.Zero)
-                return refs;
-
-            WalkForReferences(tree.RootNode, filePath, refs, enclosingSymbol: null);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[CSharpParser Reference Error] {ex}");
-        }
-
-        return refs;
-    }
 
     private static void WalkForReferences(Node node, string filePath, List<SymbolReference> refs, string? enclosingSymbol)
     {

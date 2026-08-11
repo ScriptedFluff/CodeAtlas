@@ -6,17 +6,22 @@ namespace CodeGraphMcp.Db;
 public sealed class CodeGraphDb : IDisposable
 {
     private readonly SqliteConnection _connection;
+    public SqliteConnection Connection => _connection;
+    public string DbFilePath { get; }
     public SymbolQueries Symbols { get; }
     public ReferenceQueries References { get; }
     public IndexStateQueries IndexState { get; }
     public CrossStackQueries CrossStack { get; }
 
+
     public CodeGraphDb(string dbPath, bool readOnly = false)
     {
+        DbFilePath = dbPath;
+
         if (!readOnly)
         {
             var dir = Path.GetDirectoryName(dbPath);
-            if (dir is not null) Directory.CreateDirectory(dir);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
         }
 
         var connectionString = readOnly

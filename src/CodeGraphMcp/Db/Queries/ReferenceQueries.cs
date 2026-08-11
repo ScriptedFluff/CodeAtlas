@@ -102,4 +102,61 @@ public sealed class ReferenceQueries(SqliteConnection connection)
         }
         tx.Commit();
     }
+
+    /// <summary>
+    /// Bulk inserts references for multiple files within a single transaction using the SymbolLookupCache.
+    /// </summary>
+    public void UpsertReferencesBatch(
+        IReadOnlyList<(string FilePath, IReadOnlyList<SymbolReference> Refs)> fileRefsBatch,
+        SymbolLookupCache cache)
+    {
+        using var tx = connection.BeginTransaction();
+
+        using var delete = connection.CreateCommand();
+        delete.Transaction = tx;
+        delete.CommandText = "DELETE FROM symbol_references WHERE file_path = @filePath;";
+        var pDelPath = delete.Parameters.Add("@filePath", SqliteType.Text);
+
+        foreach (var (filePath, _) in fileRefsBatch)
+        {
+            pDelPath.Value = filePath;
+            delete.ExecuteNonQuery();
+        }
+
+        using var insert = connection.CreateCommand();
+        insert.Transaction = tx;
+        insert.CommandText = """
+            INSERT INTO symbol_references
+                (caller_symbol_id, target_symbol_id, reference_type, file_path, line_number)
+            VALUES (@callerId, @targetId, @refType, @filePath, @lineNumber);
+            """;
+
+        var pCallerId   = insert.Parameters.Add("@callerId",   SqliteType.Integer);
+        var pTargetId   = insert.Parameters.Add("@targetId",   SqliteType.Integer);
+        var pRefType    = insert.Parameters.Add("@refType",    SqliteType.Text);
+        var pFilePath   = insert.Parameters.Add("@filePath",   SqliteType.Text);
+        var pLineNumber = insert.Parameters.Add("@lineNumber", SqliteType.Integer);
+
+        foreach (var (filePath, references) in fileRefsBatch)
+        {
+            foreach (var r in references)
+            {
+                var callerId = cache.ResolveId(r.CallerSymbolName, filePath)
+                            ?? cache.GetPrimarySymbolIdForFile(filePath);
+                var targetId = cache.ResolveId(r.TargetSymbolName, null);
+
+                if (callerId is null || targetId is null) continue;
+
+                pCallerId.Value   = callerId.Value;
+                pTargetId.Value   = targetId.Value;
+                pRefType.Value    = r.ReferenceType;
+                pFilePath.Value   = r.FilePath;
+                pLineNumber.Value = r.LineNumber;
+                insert.ExecuteNonQuery();
+            }
+        }
+
+        tx.Commit();
+    }
 }
+

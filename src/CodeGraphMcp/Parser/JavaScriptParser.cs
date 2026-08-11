@@ -10,28 +10,37 @@ public sealed class JavaScriptParser : JsTsParserBase, ILanguageParser
     public string Language => "javascript";
 
     private static readonly TreeSitter.Language JsLanguage = new("tree-sitter-typescript", "tree_sitter_typescript");
+    private static readonly ThreadLocal<TreeSitter.Parser> ThreadParser = new(() => new TreeSitter.Parser());
 
-    public IEnumerable<Symbol> Parse(string filePath, string source)
+    public FileParseResult ParseFile(string filePath, string source)
     {
         var symbols = new List<Symbol>();
+        var refs = new List<SymbolReference>();
         try
         {
-            using var parser = new TreeSitter.Parser();
+            var parser = ThreadParser.Value!;
             parser.Language = JsLanguage;
 
             using var tree = parser.Parse(source);
             if (tree == null || tree.RootNode.Id == IntPtr.Zero)
-                return symbols;
+                return new FileParseResult(symbols, refs);
 
             TraverseNode(tree.RootNode, filePath, symbols, currentClass: null);
+            WalkForReferences(tree.RootNode, filePath, refs, enclosingSymbol: null);
         }
         catch
         {
             // Catch parser exception gracefully per ILanguageParser contract
         }
 
-        return symbols;
+        return new FileParseResult(symbols, refs);
     }
+
+    public IEnumerable<Symbol> Parse(string filePath, string source)
+        => ParseFile(filePath, source).Symbols;
+
+    public IEnumerable<SymbolReference> ParseReferences(string filePath, string source)
+        => ParseFile(filePath, source).References;
 
     private static void TraverseNode(Node node, string filePath, List<Symbol> symbols, string? currentClass)
     {
@@ -132,27 +141,7 @@ public sealed class JavaScriptParser : JsTsParserBase, ILanguageParser
         }
     }
 
-    public IEnumerable<SymbolReference> ParseReferences(string filePath, string source)
-    {
-        var refs = new List<SymbolReference>();
-        try
-        {
-            using var parser = new TreeSitter.Parser();
-            parser.Language = JsLanguage;
 
-            using var tree = parser.Parse(source);
-            if (tree == null || tree.RootNode.Id == IntPtr.Zero)
-                return refs;
-
-            WalkForReferences(tree.RootNode, filePath, refs, enclosingSymbol: null);
-        }
-        catch
-        {
-            // Catch parser exception gracefully per ILanguageParser contract
-        }
-
-        return refs;
-    }
 
     private static void WalkForReferences(Node node, string filePath, List<SymbolReference> refs, string? enclosingSymbol)
     {

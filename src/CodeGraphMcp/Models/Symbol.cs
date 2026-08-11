@@ -2,7 +2,7 @@ namespace CodeGraphMcp.Models;
 
 public sealed record Symbol
 {
-    public long Id { get; init; }
+    public long Id { get; set; }
     public required string SymbolName { get; init; }
     public required SymbolType SymbolType { get; init; }
     public string? ClassName { get; init; }         // Enclosing class (null for top-level)

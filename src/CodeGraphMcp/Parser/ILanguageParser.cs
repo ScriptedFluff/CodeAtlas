@@ -21,4 +21,15 @@ public interface ILanguageParser
     /// Default returns empty — opt-in per language.
     /// </summary>
     IEnumerable<SymbolReference> ParseReferences(string filePath, string source) => [];
+
+    /// <summary>
+    /// Parse the source file and extract both symbols and references in a single pass.
+    /// </summary>
+    FileParseResult ParseFile(string filePath, string source) =>
+        new(Parse(filePath, source).ToList(), ParseReferences(filePath, source).ToList());
 }
+
+public sealed record FileParseResult(
+    IReadOnlyList<Symbol> Symbols,
+    IReadOnlyList<SymbolReference> References);
+
