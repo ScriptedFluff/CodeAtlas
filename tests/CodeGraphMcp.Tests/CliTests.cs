@@ -151,4 +151,49 @@ public class CliTests : IDisposable
             Console.SetError(currentErr);
         }
     }
+
+    [Fact]
+    public async Task QueryCommand_WithReferencedFlag_DisplaysCallers()
+    {
+        using (var db = new CodeGraphDb(_dbPath))
+        {
+            db.Migrate();
+            db.Symbols.UpsertFile("Target.cs", new[]
+            {
+                new CodeGraphMcp.Models.Symbol { SymbolName = "MyTarget", SymbolType = SymbolType.Class, FilePath = "Target.cs", StartLine = 1, EndLine = 20, StartByte = 0, EndByte = 100 }
+            });
+            db.Symbols.UpsertFile("Caller.cs", new[]
+            {
+                new CodeGraphMcp.Models.Symbol { SymbolName = "MyCaller", SymbolType = SymbolType.Method, FilePath = "Caller.cs", StartLine = 10, EndLine = 15, StartByte = 50, EndByte = 120 }
+            });
+
+            var cache = SymbolLookupCache.BuildFromDb(db.Connection);
+            db.References.UpsertReferencesBatch(new[]
+            {
+                ("Caller.cs", (IReadOnlyList<SymbolReference>)new[]
+                {
+                    new SymbolReference("MyCaller", "MyTarget", "Call", "Caller.cs", 12)
+                })
+            }, cache);
+        }
+
+        var currentOut = Console.Out;
+        using var sw = new StringWriter();
+        try
+        {
+            Console.SetOut(sw);
+            var root = CommandFactory.CreateRootCommand();
+            var exitCode = await root.InvokeAsync(new[] { "query", "MyTarget", "-r", _tempRepoDir, "--store-local", "--referenced" });
+
+            Assert.Equal(0, exitCode);
+            var output = sw.ToString();
+            Assert.Contains("[Class] MyTarget", output);
+            Assert.Contains("Referenced in (1 places)", output);
+            Assert.Contains("[Call] Caller.cs:12 (MyCaller)", output);
+        }
+        finally
+        {
+            Console.SetOut(currentOut);
+        }
+    }
 }

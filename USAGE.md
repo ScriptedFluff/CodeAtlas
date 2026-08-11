@@ -78,25 +78,27 @@ The `query` command searches for symbol definitions by name across the indexed c
 # Query current directory
 dotnet run --project src/CodeGraphMcp -- query "IndexOrchestrator" --store-local
 
-# Query a specific project directory from anywhere
-dotnet run --project src/CodeGraphMcp -- query "MyClass" --repo "C:\Projects\MyOtherApp" --store-local
+# Query a specific project directory from anywhere with incoming references/call sites
+dotnet run --project src/CodeGraphMcp -- query "Individual" --repo "D:\Work\Clever Services\21959" --referenced
 
-# Or using the published binary
-.\publish\CodeGraphMcp.exe query "MyClass" -r "C:\Projects\MyOtherApp" -l
+# Or using the published binary with --with-references alias
+.\publish\CodeGraphMcp.exe query "MyClass" -r "C:\Projects\MyOtherApp" -l --with-references
 ```
 
 ### Command Options
 
-| Flag | Short | Description |
+| Flag | Short / Alias | Description |
 | :--- | :--- | :--- |
 | `<symbol-name>` | — | **Required.** Name of the class, interface, method, or function to look up. |
 | `--repo` | `-r` | Target repository directory to query (defaults to current working directory). |
+| `--referenced` | `--with-references` | Display incoming callers/reference sites grouped under matched symbols in an indented tree view. |
 | `--store-local` | `-l` | Uses `.agent-index/codegraph.db` inside the specified target repo root. |
 | `--db-dir` | — | Override directory location where SQLite database file was saved. |
 
 ### Features
 1. **Live Uncommitted Check**: The query tool automatically checks for uncommitted changes on disk (dirty buffer). If a symbol is found in an uncommitted modification, it labels the result as `[LIVE - uncommitted]`.
 2. **Database Lookup**: If no uncommitted changes match, it returns matched symbols stored in the SQLite database index.
+3. **Reference Call Site Tree**: Adding `--referenced` (or `--with-references`) prints call sites, parameter usages, and type instantiations directly under the symbol definition.
 
 ### Sample Output
 ```text

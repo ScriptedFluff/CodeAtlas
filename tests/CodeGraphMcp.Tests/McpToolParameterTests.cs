@@ -72,4 +72,50 @@ public class McpToolParameterTests
             if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task GetSymbolDefinitionTool_WithReferences_ReturnsCallerList()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "McpToolRefTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        File.WriteAllText(Path.Combine(tempDir, "CallerService.cs"), """
+            namespace Sample;
+            public class CallerService
+            {
+                public void Execute()
+                {
+                    var target = new TargetService();
+                }
+            }
+            public class TargetService {}
+            """);
+
+        using var dbManager = new WorkspaceDbManager();
+        var workspaceService = new DynamicWorkspaceService(dbManager);
+        var parsers = new ILanguageParser[] { new CSharpParser(), new TypeScriptParser(), new HtmlParser(), new PowerShellParser() };
+        var bufferManager = new WorkspaceBufferManager(parsers);
+
+        try
+        {
+            var defTool = new GetSymbolDefinitionTool(workspaceService, bufferManager);
+            
+            // Without withReferences
+            var resDefault = await defTool.GetSymbolDefinitionAsync("TargetService", targetDirectory: tempDir, withReferences: false);
+            Assert.NotNull(resDefault);
+            Assert.Null(resDefault.References);
+
+            // With withReferences = true
+            var resWithRefs = await defTool.GetSymbolDefinitionAsync("TargetService", targetDirectory: tempDir, withReferences: true);
+            Assert.NotNull(resWithRefs);
+            Assert.NotNull(resWithRefs.References);
+            Assert.NotEmpty(resWithRefs.References);
+            Assert.Contains(resWithRefs.References, r => r.CallerName == "Execute" || r.CallerName == "CallerService");
+        }
+        finally
+        {
+            dbManager.Dispose();
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true);
+        }
+    }
 }

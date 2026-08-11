@@ -65,14 +65,16 @@ public static class CommandFactory
 
 
         // ── query ──────────────────────────────────────────────────────────────────
-        var symbolArgument = new Argument<string>("symbol-name", "Name of the symbol to look up");
-        var repoOption     = new Option<DirectoryInfo?>(new[] { "--repo", "-r" }, "Repository path to query (defaults to current working directory)");
-        var queryCommand   = new Command("query", "Query the knowledge graph for a symbol");
+        var symbolArgument   = new Argument<string>("symbol-name", "Name of the symbol to look up");
+        var repoOption       = new Option<DirectoryInfo?>(new[] { "--repo", "-r" }, "Repository path to query (defaults to current working directory)");
+        var referencedOption = new Option<bool>(new[] { "--referenced", "--with-references" }, "Display incoming references/call sites for matched symbols");
+        var queryCommand     = new Command("query", "Query the knowledge graph for a symbol");
         queryCommand.AddArgument(symbolArgument);
         queryCommand.AddOption(repoOption);
         queryCommand.AddOption(dbDirOption);
         queryCommand.AddOption(storeLocalOption);
-        queryCommand.SetHandler((symbol, repoOpt, dbDir, storeLocal) =>
+        queryCommand.AddOption(referencedOption);
+        queryCommand.SetHandler((symbol, repoOpt, dbDir, storeLocal, withReferences) =>
         {
             var startDir = repoOpt?.FullName ?? Directory.GetCurrentDirectory();
             var repoRoot = repoOpt is not null ? startDir : (FindGitRoot(startDir) ?? startDir);
@@ -95,7 +97,13 @@ public static class CommandFactory
             {
                 Console.WriteLine($"[LIVE - uncommitted]");
                 foreach (var sym in dirtyResults)
+                {
                     Console.WriteLine($"  [{sym.SymbolType}] {sym.SymbolName} | {sym.FilePath}:{sym.StartLine}-{sym.EndLine}");
+                    if (withReferences)
+                    {
+                        PrintReferences(db, sym.SymbolName);
+                    }
+                }
                 return;
             }
 
@@ -108,8 +116,12 @@ public static class CommandFactory
             foreach (var sym in results)
             {
                 Console.WriteLine($"[{sym.SymbolType}] {sym.SymbolName} | {sym.FilePath}:{sym.StartLine}-{sym.EndLine}");
+                if (withReferences)
+                {
+                    PrintReferences(db, sym.SymbolName);
+                }
             }
-        }, symbolArgument, repoOption, dbDirOption, storeLocalOption);
+        }, symbolArgument, repoOption, dbDirOption, storeLocalOption, referencedOption);
 
         // ── serve ──────────────────────────────────────────────────────────────────
         var serveRepoArg          = new Argument<DirectoryInfo?>("repo-path", () => null, "Repository path to serve (optional)");
@@ -294,5 +306,24 @@ public static class CommandFactory
             dir = dir.Parent;
         }
         return null;
+    }
+
+    private static void PrintReferences(CodeGraphDb db, string symbolName)
+    {
+        var callers = db.References.FindCallers(symbolName);
+        if (callers.Count > 0)
+        {
+            Console.WriteLine($"  └── Referenced in ({callers.Count} places):");
+            for (int i = 0; i < callers.Count; i++)
+            {
+                var caller = callers[i];
+                var prefix = i == callers.Count - 1 ? "      └──" : "      ├──";
+                Console.WriteLine($"{prefix} [{caller.ReferenceType}] {caller.FilePath}:{caller.LineNumber} ({caller.CallerName})");
+            }
+        }
+        else
+        {
+            Console.WriteLine("  └── Referenced in (0 places)");
+        }
     }
 }

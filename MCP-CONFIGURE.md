@@ -150,7 +150,7 @@ Once connected, AI assistants gain access to these 5 tools:
 
 | Tool Name | Purpose | Key Parameters |
 | :--- | :--- | :--- |
-| `get_symbol_definition` | Retrieves exact source code, line range, signature, and doc comments for a symbol. Reads dirty buffer if unsaved changes exist on disk. | `symbolName`, `symbolType`, `filePath`, `targetDirectory` |
+| `get_symbol_definition` | Retrieves exact source code, line range, signature, and doc comments for a symbol. Accepts `withReferences: true` to include incoming call sites. Reads dirty buffer if unsaved changes exist on disk. | `symbolName`, `symbolType`, `filePath`, `targetDirectory`, `withReferences` |
 | `find_symbol_callers` | Queries symbol reference graph to find all caller invocations across the project. | `symbolName`, `targetDirectory` |
 | `search_codebase_graph` | Wildcard symbol pattern search (`%`) with type and language filtering. | `pattern`, `symbolType`, `language`, `targetDirectory` |
 | `get_diff_impact` | Analyzes git diffs and dirty buffer to evaluate blast radius before refactoring. | `sinceCommit`, `targetDirectory` |

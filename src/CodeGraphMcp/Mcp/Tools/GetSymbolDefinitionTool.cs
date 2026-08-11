@@ -16,7 +16,8 @@ public sealed record SymbolDefinitionResult(
     string? Signature,
     string? DocComment,
     string? SourceCode,
-    bool IsLive);
+    bool IsLive,
+    IReadOnlyList<CallerEntry>? References = null);
 
 [McpServerToolType]
 public sealed class GetSymbolDefinitionTool(
@@ -36,6 +37,7 @@ public sealed class GetSymbolDefinitionTool(
         [Description("Optional: Class, Method, Interface, Property, Enum, Function")] string? symbolType = null,
         [Description("Optional: filter by relative file path substring")] string? filePath = null,
         [Description("Optional: target repository/workspace directory to query (defaults to active workspace)")] string? targetDirectory = null,
+        [Description("Optional: set to true to include incoming callers/reference sites in the result")] bool withReferences = false,
         CancellationToken ct = default)
     {
         var context = await workspaceService.GetOrIndexWorkspaceAsync(targetDirectory, ct);
@@ -57,6 +59,7 @@ public sealed class GetSymbolDefinitionTool(
 
                 if (hit is not null)
                 {
+                    var callers = withReferences ? db.References.FindCallers(hit.SymbolName) : null;
                     return new SymbolDefinitionResult(
                         hit.SymbolName,
                         hit.SymbolType.ToString(),
@@ -66,7 +69,8 @@ public sealed class GetSymbolDefinitionTool(
                         hit.Signature,
                         hit.DocComment,
                         ReadSourceRange(context.WorkspaceRoot, hit),
-                        IsLive: true);
+                        IsLive: true,
+                        References: callers);
                 }
             }
         }
@@ -82,6 +86,7 @@ public sealed class GetSymbolDefinitionTool(
 
         if (match is null) return null;
 
+        var dbCallers = withReferences ? db.References.FindCallers(match.SymbolName) : null;
         return new SymbolDefinitionResult(
             match.SymbolName,
             match.SymbolType.ToString(),
@@ -91,7 +96,8 @@ public sealed class GetSymbolDefinitionTool(
             match.Signature,
             match.DocComment,
             ReadSourceRange(context.WorkspaceRoot, match),
-            IsLive: false);
+            IsLive: false,
+            References: dbCallers);
     }
 
     private static string? ReadSourceRange(string workspaceRoot, Symbol sym)
