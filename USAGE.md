@@ -89,8 +89,10 @@ dotnet run --project src/CodeGraphMcp -- query "Individual" --repo "D:\Work\Clev
 
 | Flag | Short / Alias | Description |
 | :--- | :--- | :--- |
-| `<symbol-name>` | — | **Required.** Name of the class, interface, method, or function to look up. |
+| `<symbol-name>` | — | **Required.** Name of the symbol to look up (supports `%` wildcards). |
 | `--repo` | `-r` | Target repository directory to query (defaults to current working directory). |
+| `--type` | `-t` | Filter results by symbol type (e.g. `Class`, `Method`, `Interface`, `Property`, `Enum`, `Function`). |
+| `--language` | `--lang` | Filter results by programming language (e.g. `csharp`, `typescript`, `html`, `json`, `yaml`, `css`, `powershell`). |
 | `--referenced` | `--with-references` | Display incoming callers/reference sites grouped under matched symbols in an indented tree view. |
 | `--store-local` | `-l` | Uses `.agent-index/codegraph.db` inside the specified target repo root. |
 | `--db-dir` | — | Override directory location where SQLite database file was saved. |
@@ -207,7 +209,7 @@ dotnet run --project src/CodeGraphMcp -- serve -r "C:\path\to\your\repository" -
 
 ### MCP Tools Provided
 
-The MCP server exposes 6 specialized tools to AI clients:
+The MCP server exposes 7 specialized tools to AI clients:
 
 #### 1. `get_symbol_definition`
 Retrieves the exact source code snippet, precise line range (StartLine to EndLine), signature, and doc comments for a symbol. Automatically scopes to active workspace project.
@@ -234,6 +236,7 @@ Searches indexed symbols matching name patterns with optional filters. Automatic
   - `targetDirectory`: Optional workspace root override.
   - `exactMatch`: Optional boolean (`true` to enforce exact case-insensitive symbol name matching).
   - `regex`: Optional regular expression string to post-filter symbol names.
+  - `limit`: Optional integer result count cap (default 20, pass higher limit or 0 for expanded/unlimited up to 500 max cap).
 
 #### 4. `get_supported_languages`
 Discovers supported file extensions and active AST parsers on the CodeGraphMcp server instance.
@@ -250,6 +253,12 @@ Extracts cross-stack mapping between C# request/response DTOs, TypeScript interf
 - **Parameters:**
   - `dtoName`: C# DTO class name (e.g. `GetUserBillingRequest`).
   - `targetDirectory`: Optional workspace root override.
+
+#### 7. `prune_indexed_worktrees`
+Scans the global index storage cache for database files whose repository roots or git worktrees no longer exist on disk, purging obsolete `.db` files and freeing disk space. Runs automatically on startup.
+- **Parameters:**
+  - `dbDir`: Optional override path to database cache directory.
+  - `dryRun`: Set `true` to preview candidate databases to prune without performing actual deletion.
 
 ### MCP Configuration Example (`mcp_config.json`)
 
@@ -273,6 +282,42 @@ Extracts cross-stack mapping between C# request/response DTOs, TypeScript interf
 - **Default Database Path**: `%LOCALAPPDATA%/CodeGraphMcp/codegraph.db` (if `--store-local` or `--db-dir` are omitted).
 - **Local Database Path (`--store-local`)**: `<repo-root>/.agent-index/codegraph.db`.
 - **Database Engine**: SQLite (managed via `Microsoft.Data.Sqlite` and `Dapper`).
+
+### Repository & Custom Ignore / Include Configurations
+
+`CodeGraphMcp` automatically loads ignore and include rules from `codegraphmcp.json` or `appsettings.json` to customize indexing targets and exclude heavy auto-generated data, test outputs, or lockfiles:
+
+1. **Repository Root Config (`codegraphmcp.json` or `.codegraphmcp.json`)**:
+   Place a `codegraphmcp.json` in your repository root to declare project-specific include patterns, ignore patterns, or directory exclusions:
+   ```json
+   {
+     "Include": [
+       "*"
+     ],
+     "Ignore": [
+       "**/*test*/**/*.json",
+       "**/*Test*/**/*.json"
+     ],
+     "IgnoreDirectories": [
+       "test-fixtures"
+     ]
+   }
+   ```
+
+2. **`Include` & `Ignore` Rule Behavior**:
+   - **`Include` Array Rules**: If `"Include"` is missing, empty (`[]`), or contains `"*"` anywhere in the list, `CodeGraphMcp` ignores the include filter and processes all supported codebase files. If specific glob patterns are declared (e.g. `["src/**/*.cs", "*.json"]`), indexing will only parse files matching at least one include pattern.
+   - **`Ignore` Wildcard Warnings**: If `"Ignore"` contains wildcard `"*"` or `"**"`, `CodeGraphMcp` emits an explicit console warning (`Ignore configuration contains wildcard '*' — all files have been filtered out`) to prevent confusion when 0 files are indexed.
+
+3. **Global Application Config (`appsettings.json`)**:
+   Built-in defaults inside `appsettings.json` ignore common package lockfiles and output directories by default:
+   - **Default Ignore Patterns**: `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `*.min.json`, `*.min.js`, `*.min.css`, `*.map`.
+   - **Default Ignore Directories**: `node_modules`, `bin`, `obj`, `dist`, `.next`, `coverage`, `.vs`, `packages`, `publish`.
+
+4. **Config Loading Hierarchy**:
+   - `codegraphmcp.json` / `.codegraphmcp.json` (Repository root)
+   - `.codegraph.json` (Repository root)
+   - `appsettings.json` (Repository root or executable output directory)
+   - `.gitignore` rules (Git root and subdirectories)
 
 ---
 

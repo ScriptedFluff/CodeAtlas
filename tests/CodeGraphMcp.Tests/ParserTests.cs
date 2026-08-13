@@ -189,5 +189,34 @@ public class CssParserTests
     }
 }
 
+public class HtmlParserTests
+{
+    private static readonly HtmlParser Parser = new();
+
+    [Fact]
+    public void Parse_CsprojAndXmlSource_ExtractsTagsAndPackageReferences()
+    {
+        var source = """
+        <Project Sdk="Microsoft.NET.Sdk">
+          <ItemGroup>
+            <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+          </ItemGroup>
+        </Project>
+        """;
+
+        var symbols = Parser.Parse("App.csproj", source).ToList();
+
+        Assert.Contains(symbols, s => s.SymbolName == "Project" && s.SymbolType == SymbolType.Class);
+        Assert.Contains(symbols, s => s.SymbolName == "ItemGroup" && s.SymbolType == SymbolType.Class);
+        Assert.Contains(symbols, s => s.SymbolName == "PackageReference" && s.SymbolType == SymbolType.Class);
+        Assert.Contains(symbols, s => s.SymbolName == "Microsoft.Data.Sqlite" && s.SymbolType == SymbolType.Property);
+        Assert.All(symbols, s => Assert.Equal("html", s.Language));
+        Assert.Contains(".xml", Parser.FileExtensions);
+        Assert.Contains(".csproj", Parser.FileExtensions);
+        Assert.Contains(".config", Parser.FileExtensions);
+    }
+}
+
+
 
 

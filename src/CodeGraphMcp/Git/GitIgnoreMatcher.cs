@@ -85,7 +85,7 @@ public sealed class GitIgnoreMatcher
         return ignored;
     }
 
-    private sealed class IgnoreRule
+    internal sealed class IgnoreRule
     {
         public bool IsNegated { get; }
         public bool DirectoryOnly { get; }

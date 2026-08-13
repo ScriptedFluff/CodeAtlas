@@ -68,14 +68,32 @@ public static class CommandFactory
         var symbolArgument   = new Argument<string>("symbol-name", "Name of the symbol to look up");
         var repoOption       = new Option<DirectoryInfo?>(new[] { "--repo", "-r" }, "Repository path to query (defaults to current working directory)");
         var referencedOption = new Option<bool>(new[] { "--referenced", "--with-references" }, "Display incoming references/call sites for matched symbols");
+        var typeOption       = new Option<string?>(new[] { "--type", "-t" }, "Filter by symbol type (e.g. Class, Method, Interface, Property, Enum, Function)");
+        var languageOption   = new Option<string?>(new[] { "--language", "--lang" }, "Filter by programming language (e.g. csharp, typescript, html, json, yaml, css, powershell)");
+        var limitOption      = new Option<int>(new[] { "--limit" }, () => 500, "Maximum number of symbols to return");
+        var skipOption       = new Option<int>(new[] { "--skip", "--offset" }, () => 0, "Number of symbols to skip for pagination");
         var queryCommand     = new Command("query", "Query the knowledge graph for a symbol");
         queryCommand.AddArgument(symbolArgument);
         queryCommand.AddOption(repoOption);
+        queryCommand.AddOption(typeOption);
+        queryCommand.AddOption(languageOption);
+        queryCommand.AddOption(limitOption);
+        queryCommand.AddOption(skipOption);
         queryCommand.AddOption(dbDirOption);
         queryCommand.AddOption(storeLocalOption);
         queryCommand.AddOption(referencedOption);
-        queryCommand.SetHandler((symbol, repoOpt, dbDir, storeLocal, withReferences) =>
+        queryCommand.SetHandler((context) =>
         {
+            var symbol         = context.ParseResult.GetValueForArgument(symbolArgument);
+            var repoOpt        = context.ParseResult.GetValueForOption(repoOption);
+            var typeOpt        = context.ParseResult.GetValueForOption(typeOption);
+            var langOpt        = context.ParseResult.GetValueForOption(languageOption);
+            var limitVal       = context.ParseResult.GetValueForOption(limitOption);
+            var skipVal        = context.ParseResult.GetValueForOption(skipOption);
+            var dbDir          = context.ParseResult.GetValueForOption(dbDirOption);
+            var storeLocal     = context.ParseResult.GetValueForOption(storeLocalOption);
+            var withReferences = context.ParseResult.GetValueForOption(referencedOption);
+
             var startDir = repoOpt?.FullName ?? Directory.GetCurrentDirectory();
             var repoRoot = repoOpt is not null ? startDir : (FindGitRoot(startDir) ?? startDir);
             var dbPath   = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, repoRoot);
@@ -92,22 +110,38 @@ public static class CommandFactory
             var buffer  = new DirtyFileBuffer(repoRoot, parsers);
             buffer.Refresh();
 
-            var dirtyResults = buffer.FindByName(symbol);
+            var dirtyResults = buffer.FindByName(symbol, langOpt);
             if (dirtyResults is not null && dirtyResults.Count > 0)
             {
-                Console.WriteLine($"[LIVE - uncommitted]");
-                foreach (var sym in dirtyResults)
+                var filteredDirty = dirtyResults
+                    .Where(s => typeOpt is null || s.SymbolType.ToString().Equals(typeOpt, StringComparison.OrdinalIgnoreCase))
+                    .Where(s => langOpt is null || (s.Language ?? "").Equals(langOpt, StringComparison.OrdinalIgnoreCase))
+                    .Skip(Math.Max(0, skipVal))
+                    .Take(limitVal <= 0 ? 500 : limitVal)
+                    .ToList();
+
+                if (filteredDirty.Count > 0)
                 {
-                    Console.WriteLine($"  [{sym.SymbolType}] {sym.SymbolName} | {sym.FilePath}:{sym.StartLine}-{sym.EndLine}");
-                    if (withReferences)
+                    Console.WriteLine($"[LIVE - uncommitted]");
+                    foreach (var sym in filteredDirty)
                     {
-                        PrintReferences(db, sym.SymbolName);
+                        Console.WriteLine($"  [{sym.SymbolType}] {sym.SymbolName} ({sym.Language}) | {sym.FilePath}:{sym.StartLine}-{sym.EndLine}");
+                        if (withReferences)
+                        {
+                            PrintReferences(db, sym.SymbolName);
+                        }
                     }
+                    return;
                 }
-                return;
             }
 
-            var results = db.Symbols.FindByName(symbol);
+            var fetchMax = Math.Max(skipVal + limitVal, 500);
+            var results = db.Symbols.FindByName(symbol, fetchMax, Math.Max(0, skipVal))
+                .Where(s => typeOpt is null || s.SymbolType.ToString().Equals(typeOpt, StringComparison.OrdinalIgnoreCase))
+                .Where(s => langOpt is null || (s.Language ?? "").Equals(langOpt, StringComparison.OrdinalIgnoreCase))
+                .Take(limitVal <= 0 ? 500 : limitVal)
+                .ToList();
+
             if (results.Count == 0)
             {
                 Console.WriteLine($"No symbols found matching '{symbol}'.");
@@ -115,13 +149,13 @@ public static class CommandFactory
             }
             foreach (var sym in results)
             {
-                Console.WriteLine($"[{sym.SymbolType}] {sym.SymbolName} | {sym.FilePath}:{sym.StartLine}-{sym.EndLine}");
+                Console.WriteLine($"[{sym.SymbolType}] {sym.SymbolName} ({sym.Language}) | {sym.FilePath}:{sym.StartLine}-{sym.EndLine}");
                 if (withReferences)
                 {
                     PrintReferences(db, sym.SymbolName);
                 }
             }
-        }, symbolArgument, repoOption, dbDirOption, storeLocalOption, referencedOption);
+        });
 
         // ── serve ──────────────────────────────────────────────────────────────────
         var serveRepoArg          = new Argument<DirectoryInfo?>("repo-path", () => null, "Repository path to serve (optional)");
@@ -275,6 +309,16 @@ public static class CommandFactory
             Console.WriteLine("Stopped.");
         }, repoArgument, dbDirOption, storeLocalOption, intervalOption);
 
+        // ── prune ──────────────────────────────────────────────────────────────────
+        var pruneCommand = new Command("prune", "Remove stale index databases for non-existent repositories or worktrees");
+        pruneCommand.AddOption(dbDirOption);
+        pruneCommand.SetHandler(async (dbDir) =>
+        {
+            var tool = new Mcp.Tools.PruneIndexedWorktreesTool();
+            var res = await tool.PruneIndexedWorktreesAsync(dbDir?.FullName);
+            Console.WriteLine($"Pruned {res.PrunedDatabaseCount} stale database(s), freed {res.TotalBytesFreed:N0} bytes.");
+        }, dbDirOption);
+
         // ── root ───────────────────────────────────────────────────────────────────
         var rootCommand = new RootCommand("CodeGraphMcp — local code knowledge graph engine");
         rootCommand.AddCommand(indexCommand);
@@ -283,6 +327,7 @@ public static class CommandFactory
         rootCommand.AddCommand(statusCommand);
         rootCommand.AddCommand(cleanCommand);
         rootCommand.AddCommand(watchCommand);
+        rootCommand.AddCommand(pruneCommand);
 
         return rootCommand;
     }
@@ -291,8 +336,12 @@ public static class CommandFactory
     [
         new CSharpParser(),
         new TypeScriptParser(),
+        new JavaScriptParser(),
         new HtmlParser(),
-        new PowerShellParser()
+        new PowerShellParser(),
+        new JsonParser(),
+        new YamlParser(),
+        new CssParser()
     ];
 
     private static string? FindGitRoot(string start)

@@ -85,4 +85,46 @@ public class SearchCodebaseGraphToolTests
             if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task SearchCodebaseGraphAsync_WithCustomLimitAndRelevanceSorting_AppliesLimitAndSorts()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "SearchLimitTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        File.WriteAllText(Path.Combine(tempDir, "Sample.cs"), """
+            namespace Sample;
+            public class UserItem 
+            {
+                public string UserItemProp { get; set; }
+                public void UserItemMethod() {}
+            }
+            public class UserItemHelper {}
+            """);
+
+        using var dbManager = new WorkspaceDbManager();
+        var workspaceService = new DynamicWorkspaceService(dbManager);
+        var parsers = new ILanguageParser[] { new CSharpParser() };
+        var bufferManager = new WorkspaceBufferManager(parsers);
+
+        try
+        {
+            var searchTool = new SearchCodebaseGraphTool(workspaceService, bufferManager);
+
+            // Test custom limit = 2
+            var limitedResult = await searchTool.SearchCodebaseGraphAsync("UserItem%", targetDirectory: tempDir, limit: 2);
+            Assert.Equal(2, limitedResult.Matches.Count);
+
+            // Test relevance sorting (Class declarations should come before Method and Property)
+            var fullResult = await searchTool.SearchCodebaseGraphAsync("UserItem%", targetDirectory: tempDir, limit: 10);
+            Assert.True(fullResult.Matches.Count >= 3);
+            Assert.Equal("Class", fullResult.Matches[0].SymbolType);
+            Assert.Equal("Class", fullResult.Matches[1].SymbolType);
+        }
+        finally
+        {
+            dbManager.Dispose();
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true);
+        }
+    }
 }

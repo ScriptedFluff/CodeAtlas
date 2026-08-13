@@ -71,6 +71,24 @@ public static class McpServer
             host.Services.GetRequiredService<DirtyFileBuffer>();
         }
 
+        // Trigger silent non-blocking background startup GC to purge orphaned .db files with configurable timeout
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var timeoutStr = Environment.GetEnvironmentVariable("CODEGRAPH_STARTUP_GC_TIMEOUT_MS");
+                var timeoutMs = int.TryParse(timeoutStr, out var parsed) && parsed > 0 ? parsed : 5000;
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
+                var pruner = new Tools.PruneIndexedWorktreesTool();
+                await pruner.PruneIndexedWorktreesAsync(dryRun: false, ct: cts.Token);
+            }
+            catch
+            {
+                // Silent fail-safe: startup GC should never crash the server process
+            }
+        }, CancellationToken.None);
+
         await host.RunAsync(ct);
     }
 
@@ -79,6 +97,9 @@ public static class McpServer
         new CSharpParser(),
         new TypeScriptParser(),
         new HtmlParser(),
-        new PowerShellParser()
+        new PowerShellParser(),
+        new JsonParser(),
+        new YamlParser(),
+        new CssParser()
     ];
 }

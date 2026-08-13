@@ -214,7 +214,7 @@ When editing files in an IDE, AI agents query the MCP server. `CodeGraphMcp` rea
 | :--- | :--- | :--- |
 | `get_symbol_definition` | `symbolName`, `symbolType`, `filePath`, `targetDirectory` | Returns exact source implementation snippet, line boundaries, signature, and doc comments. Supports `%` wildcards. |
 | `find_symbol_callers` | `symbolName`, `targetDirectory` | Performs inverse graph lookup to return all caller invocation sites. |
-| `search_codebase_graph` | `pattern`, `symbolType`, `language`, `targetDirectory` | Searches matching symbols across multi-language index using wildcard regex/SQL matching. |
+| `search_codebase_graph` | `pattern`, `symbolType`, `language`, `targetDirectory`, `exactMatch`, `regex`, `limit` | Searches matching symbols across multi-language index using wildcard regex/SQL matching with relevance ordering and configurable result limits. |
 | `get_diff_impact` | `sinceCommit`, `targetDirectory` | Computes changed symbol set and downstream callers affected by uncommitted or recent git changes. |
 | `get_servicestack_dto_contract` | `dtoName`, `targetDirectory` | Maps end-to-end ServiceStack C# DTOs to TypeScript types and consuming client components. |
 

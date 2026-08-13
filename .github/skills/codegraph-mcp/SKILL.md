@@ -79,25 +79,31 @@ For standalone terminal execution or scripting:
 # 1. Index repository incrementally (stores in .agent-index/codegraph.db)
 dotnet run --project src/CodeGraphMcp -- index "C:\path\to\repo" --store-local
 
-# 2. Query symbol by name
-dotnet run --project src/CodeGraphMcp -- query "IndexOrchestrator" -r "C:\path\to\repo" --store-local
+# 2. Query symbol by name with optional type, language, limit and skip filters
+dotnet run --project src/CodeGraphMcp -- query "Morningstar" --repo "C:\path\to\repo" --lang json --type Property --limit 20 --skip 0 --store-local
 
 # 3. Check repository index status
 dotnet run --project src/CodeGraphMcp -- status "C:\path\to\repo" --store-local
 
-# 4. Continuous watcher for background re-indexing on git updates
+# 4. Prune stale worktrees & obsolete index database caches
+dotnet run --project src/CodeGraphMcp -- prune
+
+# 5. Continuous watcher for background re-indexing on git updates
 dotnet run --project src/CodeGraphMcp -- watch "C:\path\to\repo" --store-local --interval 30
 
-# 5. Clean index database
+# 6. Clean index database
 dotnet run --project src/CodeGraphMcp -- clean "C:\path\to\repo" --store-local --yes
 
-# 6. Run MCP stdio server
+# 7. Run MCP stdio server
 dotnet run --project src/CodeGraphMcp -- serve -r "C:\path\to\repo" --store-local
 ```
 
 ---
 
 ## 4. Agent Best Practices
+
+Supports `exactMatch: true` for exact symbol matching, `regex: "..."` for pattern filtering, and `limit: 20` (pass higher limit or 0 for expanded/unlimited up to 500 max cap).
+Results are automatically sorted by structural relevance (exact matches & type definitions first). Automatically scopes to active project index. Returns precise `StartLine` and `EndLine` ranges for targeted file reading.
 
 1. **Prefer `get_symbol_definition` Over Large File Reads**: To save context window budget, query symbol definitions directly instead of reading full 1000+ line source files.
 2. **Check Diff Impact Before Refactoring**: Always run `get_diff_impact` to identify all modified/dirty files and total affected symbol counts before making structural code changes.

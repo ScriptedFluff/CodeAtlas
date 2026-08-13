@@ -170,8 +170,8 @@ public sealed class SymbolQueries(SqliteConnection connection)
     }
 
 
-    /// <summary>Find symbols by name (exact or substring match, case-insensitive).</summary>
-    public IReadOnlyList<Symbol> FindByName(string symbolName)
+    /// <summary>Find symbols by name (exact or substring match, case-insensitive) with pagination support.</summary>
+    public IReadOnlyList<Symbol> FindByName(string symbolName, int limit = 500, int offset = 0)
     {
         using var cmd = connection.CreateCommand();
         cmd.CommandText = """
@@ -182,10 +182,12 @@ public sealed class SymbolQueries(SqliteConnection connection)
             WHERE symbol_name = @exact COLLATE NOCASE
                OR symbol_name LIKE @pattern COLLATE NOCASE
             ORDER BY CASE WHEN symbol_name = @exact COLLATE NOCASE THEN 0 ELSE 1 END, file_path, start_line
-            LIMIT 50
+            LIMIT @limit OFFSET @offset
             """;
         cmd.Parameters.AddWithValue("@exact", symbolName);
         cmd.Parameters.AddWithValue("@pattern", $"%{symbolName}%");
+        cmd.Parameters.AddWithValue("@limit", limit);
+        cmd.Parameters.AddWithValue("@offset", Math.Max(0, offset));
 
         var results = new List<Symbol>();
         using var reader = cmd.ExecuteReader();
