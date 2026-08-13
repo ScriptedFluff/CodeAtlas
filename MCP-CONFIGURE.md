@@ -159,7 +159,49 @@ Once connected, AI assistants gain access to these 5 tools:
 
 ---
 
-## 6. Troubleshooting & Diagnostics
+## 6. Enforcing Tool Priority Over `grep` and `Get-ChildItem`
+
+When an AI assistant has access to multiple tools, standard LLM tool-selection heuristics often default to native built-ins like `grep_search` or CLI terminal commands (`Get-ChildItem`, `dir`, `grep`) due to tool registration prominence or false assumptions about indexing latency.
+
+To ensure AI assistants consistently prioritize `CodeGraphMcp` over text-search and terminal probing, configure system prompt interception rules for your AI engine:
+
+### A. GitHub Copilot (`.copilot/copilot-instructions.md`)
+
+Use a **STEP 0 — INPUT INTERception** pattern to force search routing before any tool calls or command executions:
+
+```markdown
+## STEP 0 — CODEBASE SEARCH ROUTING (runs before any code search or file investigation)
+
+This is not a guideline. This is step 0 of every search or investigation turn, without exception.
+
+**Before calling `grep_search`, `run_command` (`grep`, `Get-ChildItem`, `findstr`), or reading raw source files:**
+
+1. Check if the target repository contains indexed code (C#, TypeScript, JavaScript, HTML, JSON, YAML, CSS, PowerShell).
+2. **Execute `search_codebase_graph` or `get_symbol_definition` FIRST.**
+3. Use `exactMatch: true` for exact symbol lookups to prevent context noise, and `regex: "..."` for pattern filtering.
+4. Use precise `StartLine` and `EndLine` ranges returned by `CodeGraphMcp` to perform targeted partial file reads instead of loading entire source files into context window budget.
+
+**Exemptions (narrow):**
+- Searching non-code assets (e.g. Markdown documentation, images, binary assets, raw log files).
+- Explicit non-indexed filesystem checks.
+```
+
+---
+
+### B. Antigravity / Gemini AI (`GEMINI.md` / `AGENTS.md`)
+
+Add the search priority strategy rule directly to your global or project `.agents/rules/`:
+
+```markdown
+# Codebase Search Strategy Rule
+- **Prioritise CodeGraphMcp**: When searching inside indexed projects (C#, TypeScript, JavaScript, HTML, JSON, YAML, CSS, PowerShell), ALWAYS prioritize `CodeGraphMcp` tools (`search_codebase_graph`, `get_symbol_definition`, `find_symbol_callers`) over `grep_search` or terminal commands due to sub-300ms indexing and sub-50ms query speeds.
+- **Line Range Scoping**: Use returned `StartLine` to `EndLine` ranges for scoped file viewing rather than loading entire 1000+ line source files.
+- **Grep / CLI Fallback**: Use `grep_search` or CLI shell tools only as a fallback if `CodeGraphMcp` fails, is unavailable, or when searching un-indexed text assets (Markdown docs, raw logs).
+```
+
+---
+
+## 7. Troubleshooting & Diagnostics
 
 - **Clean Stdio Pipe:** All application logs and diagnostic output are routed exclusively to `stderr` (with LogLevel set to `Warning`). `stdout` is dedicated entirely to JSON-RPC protocol transport.
 - **Index Database Missing:** If a tool returns a message indicating no index database was found, run the `index` CLI command first:
