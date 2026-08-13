@@ -3,7 +3,6 @@
 [![.NET 10.0](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Native AOT](https://img.shields.io/badge/Compile-Native_AOT-007ACC?logo=visualstudio)](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/)
 [![MCP Server](https://img.shields.io/badge/Protocol-MCP-green)](https://modelcontextprotocol.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > **Local high-performance code knowledge graph indexer & query engine providing sub-100ms symbol lookups, caller reference graphs, git blast-radius impact analysis, and ServiceStack cross-stack DTO contracts for AI coding assistants.**
 
@@ -138,11 +137,19 @@ Place a `codegraphmcp.json` file in your repository root to configure project-sp
 
 ---
 
-## 👤 Author & Maintainer
+## 👤 Author & Development Transparency
 
-* **Author**: Antigravity Assistant & ScriptedFluff
-* **Repository**: [ScriptedFluff/CodeGraphMcp](https://github.com/ScriptedFluff/CodeGraphMcp)
-* **License**: MIT License
+- **Author & Maintainer**: **Garry Flanagan** ([ScriptedFluff](https://github.com/ScriptedFluff))
+- **Repository**: [ScriptedFluff/CodeGraphMcp](https://github.com/ScriptedFluff/CodeGraphMcp)
+- **License**: *To Be Determined / Pending Settlement*
+
+### 🤖 AI Pair-Programming Statement
+This project was designed and built through active AI-assisted pair-programming. As an experienced software developer, I leverage cutting-edge AI tools as velocity multipliers rather than substitutes for engineering judgment:
+- **Primary AI Assistant Platform**: Google Antigravity
+- **Code Generation & Refactoring**: Gemini 3.6
+- **Architecture Planning & Review**: 50/50 split between Claude Sonnet 4.6 and Gemini 3.6
+
+Whether inspecting symbol caller graphs, tuning AST parsers, or benchmarking Native AOT query performance, modern AI tooling allows solo developers to deliver production-grade software tools at unprecedented speed.
 
 ---
 
