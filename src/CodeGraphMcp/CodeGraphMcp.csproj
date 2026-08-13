@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Authors>Garry Flanagan</Authors>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
 
     <!-- Native AOT -->
     <PublishAot>true</PublishAot>

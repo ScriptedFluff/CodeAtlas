@@ -141,7 +141,7 @@ Place a `codegraphmcp.json` file in your repository root to configure project-sp
 
 - **Author & Maintainer**: **Garry Flanagan** ([ScriptedFluff](https://github.com/ScriptedFluff))
 - **Repository**: [ScriptedFluff/CodeGraphMcp](https://github.com/ScriptedFluff/CodeGraphMcp)
-- **License**: *To Be Determined / Pending Settlement*
+- **License**: [Apache 2.0](file:///d:/Projects/C%23/CodeGraphMcp/LICENSE)
 
 ### 🤖 AI Pair-Programming Statement
 This project was designed and built through active AI-assisted pair-programming. As an experienced software developer, I leverage cutting-edge AI tools as velocity multipliers rather than substitutes for engineering judgment:
