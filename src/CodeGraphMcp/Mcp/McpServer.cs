@@ -60,7 +60,8 @@ public static class McpServer
             .WithTools<Tools.FindSymbolCallersTool>(jsonOptions)
             .WithTools<Tools.SearchCodebaseGraphTool>(jsonOptions)
             .WithTools<Tools.GetDiffImpactTool>(jsonOptions)
-            .WithTools<Tools.GetServiceStackDtoContractTool>(jsonOptions);
+            .WithTools<Tools.GetServiceStackDtoContractTool>(jsonOptions)
+            .WithTools<Tools.GetSupportedLanguagesTool>(jsonOptions);
 
         var host = builder.Build();
 

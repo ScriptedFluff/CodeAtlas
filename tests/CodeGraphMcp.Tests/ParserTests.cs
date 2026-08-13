@@ -100,3 +100,94 @@ public class TypeScriptParserTests
     }
 }
 
+public class JsonParserTests
+{
+    private static readonly JsonParser Parser = new();
+
+    [Fact]
+    public void Parse_PackageJson_ExtractsKeys()
+    {
+        var source = """
+        {
+          "name": "my-app",
+          "version": "1.0.0",
+          "scripts": {
+            "build": "tsc"
+          }
+        }
+        """;
+        var symbols = Parser.Parse("package.json", source).ToList();
+
+        Assert.Contains(symbols, s => s.SymbolName == "name" && s.SymbolType == SymbolType.Property);
+        Assert.Contains(symbols, s => s.SymbolName == "version" && s.SymbolType == SymbolType.Property);
+        Assert.Contains(symbols, s => s.SymbolName == "scripts" && s.SymbolType == SymbolType.Property);
+        Assert.Contains(symbols, s => s.SymbolName == "build" && s.SymbolType == SymbolType.Property);
+        Assert.All(symbols, s => Assert.Equal("json", s.Language));
+    }
+}
+
+public class YamlParserTests
+{
+    private static readonly YamlParser Parser = new();
+
+    [Fact]
+    public void Parse_DockerCompose_ExtractsKeys()
+    {
+        var source = """
+        version: '3.8'
+        services:
+          web:
+            image: nginx:latest
+            ports:
+              - "80:80"
+        """;
+        var symbols = Parser.Parse("docker-compose.yml", source).ToList();
+
+        Assert.Contains(symbols, s => s.SymbolName == "version" && s.SymbolType == SymbolType.Property);
+        Assert.Contains(symbols, s => s.SymbolName == "services" && s.SymbolType == SymbolType.Property);
+        Assert.Contains(symbols, s => s.SymbolName == "web" && s.SymbolType == SymbolType.Property);
+        Assert.Contains(symbols, s => s.SymbolName == "image" && s.SymbolType == SymbolType.Property);
+        Assert.All(symbols, s => Assert.Equal("yaml", s.Language));
+    }
+}
+
+public class CssParserTests
+{
+    private static readonly CssParser Parser = new();
+
+    [Fact]
+    public void Parse_CssSource_ExtractsClassesIdsVariablesAndKeyframes()
+    {
+        var source = """
+        :root {
+          --primary-color: #007bff;
+        }
+
+        .btn-primary {
+          color: var(--primary-color);
+          background-color: #ffffff;
+        }
+
+        #header-nav {
+          display: flex;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        """;
+
+        var symbols = Parser.Parse("styles.css", source).ToList();
+
+        Assert.Contains(symbols, s => s.SymbolName == "primary-color" && s.SymbolType == SymbolType.Variable);
+        Assert.Contains(symbols, s => s.SymbolName == "btn-primary" && s.SymbolType == SymbolType.Class);
+        Assert.Contains(symbols, s => s.SymbolName == "header-nav" && s.SymbolType == SymbolType.Property);
+        Assert.Contains(symbols, s => s.SymbolName == "fadeIn" && s.SymbolType == SymbolType.Function);
+        Assert.DoesNotContain(symbols, s => s.SymbolName == "ffffff");
+        Assert.All(symbols, s => Assert.Equal("css", s.Language));
+    }
+}
+
+
+

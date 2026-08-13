@@ -27,7 +27,8 @@ public sealed class GetSymbolDefinitionTool(
     [McpServerTool]
     [Description("""
         Retrieves the exact source code of a named symbol (class, method, interface, property, etc.)
-        along with its file path, line range, signature, and doc comment.
+        along with its file path, precise line range (StartLine to EndLine), signature, and doc comment.
+        Automatically scopes to the current active workspace project index without needing manual directory restrictions.
         Returns the LIVE uncommitted version if the file has unsaved changes.
         Use this instead of reading entire source files.
         Use % as a wildcard in symbolName (e.g. 'GetUser%' matches GetUserRequest, GetUserById, etc.).

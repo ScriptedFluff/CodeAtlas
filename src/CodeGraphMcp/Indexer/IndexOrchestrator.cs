@@ -27,6 +27,9 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
             new JavaScriptParser(),
             new HtmlParser(),
             new PowerShellParser(),
+            new JsonParser(),
+            new YamlParser(),
+            new CssParser(),
         ];
         var map = new Dictionary<string, ILanguageParser>(StringComparer.OrdinalIgnoreCase);
         foreach (var p in parsers)

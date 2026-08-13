@@ -174,6 +174,9 @@ dotnet run --project src/CodeGraphMcp -- clean "C:\path\to\your\repository" --st
 - **TypeScript / JavaScript**: `.ts`, `.tsx`, `.js`, `.jsx` (Functions, Classes, Interfaces, Exports)
 - **HTML**: `.html`, `.htm` (IDs, Elements, Form Controls)
 - **PowerShell**: `.ps1`, `.psm1` (Functions, Scripts)
+- **JSON / Manifests**: `.json`, `package.json`, `appsettings.json` (Keys, Objects, Dependencies)
+- **YAML / Pipelines**: `.yaml`, `.yml` (Keys, Jobs, Pipeline Configurations)
+- **CSS / Styles**: `.css` (Rule Sets, Selectors, Classes)
 
 ---
 
@@ -204,15 +207,16 @@ dotnet run --project src/CodeGraphMcp -- serve -r "C:\path\to\your\repository" -
 
 ### MCP Tools Provided
 
-The MCP server exposes 5 specialized tools to AI clients:
+The MCP server exposes 6 specialized tools to AI clients:
 
 #### 1. `get_symbol_definition`
-Retrieves the exact source code snippet, line numbers, signature, and doc comments for a symbol.
+Retrieves the exact source code snippet, precise line range (StartLine to EndLine), signature, and doc comments for a symbol. Automatically scopes to active workspace project.
 - **Parameters:**
   - `symbolName`: Name of the symbol to look up (supports SQL LIKE `%` wildcards).
   - `symbolType`: Optional filter (`Class`, `Method`, `Interface`, `Property`, `Enum`, `Function`).
   - `filePath`: Optional relative path substring filter.
   - `targetDirectory`: Optional workspace root override.
+  - `withReferences`: Set `true` to include incoming caller sites.
 - **Features:** Reads directly from dirty uncommitted buffer if file has unsaved edits on disk.
 
 #### 2. `find_symbol_callers`
@@ -222,20 +226,26 @@ Queries the symbol reference graph to find all caller invocations across the pro
   - `targetDirectory`: Optional workspace root override.
 
 #### 3. `search_codebase_graph`
-Searches indexed symbols matching name patterns with optional filters.
+Searches indexed symbols matching name patterns with optional filters. Automatically scopes to workspace index without requiring explicit path filtering.
 - **Parameters:**
   - `pattern`: Symbol pattern using `%` wildcards (e.g. `GetUser%`).
   - `symbolType`: Optional type filter.
-  - `language`: Optional language filter (`csharp`, `typescript`, `html`, `powershell`).
+  - `language`: Optional language filter (`csharp`, `typescript`, `html`, `powershell`, `json`, `yaml`, `css`).
   - `targetDirectory`: Optional workspace root override.
+  - `exactMatch`: Optional boolean (`true` to enforce exact case-insensitive symbol name matching).
+  - `regex`: Optional regular expression string to post-filter symbol names.
 
-#### 4. `get_diff_impact`
+#### 4. `get_supported_languages`
+Discovers supported file extensions and active AST parsers on the CodeGraphMcp server instance.
+- **Parameters:** None.
+
+#### 5. `get_diff_impact`
 Analyzes git change impact and dirty files to compute the blast radius before refactoring.
 - **Parameters:**
   - `sinceCommit`: Optional commit hash to compare against.
   - `targetDirectory`: Optional workspace root override.
 
-#### 5. `get_servicestack_dto_contract`
+#### 6. `get_servicestack_dto_contract`
 Extracts cross-stack mapping between C# request/response DTOs, TypeScript interfaces, and consuming Angular components for ServiceStack endpoints.
 - **Parameters:**
   - `dtoName`: C# DTO class name (e.g. `GetUserBillingRequest`).

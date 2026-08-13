@@ -150,9 +150,10 @@ Once connected, AI assistants gain access to these 5 tools:
 
 | Tool Name | Purpose | Key Parameters |
 | :--- | :--- | :--- |
-| `get_symbol_definition` | Retrieves exact source code, line range, signature, and doc comments for a symbol. Accepts `withReferences: true` to include incoming call sites. Reads dirty buffer if unsaved changes exist on disk. | `symbolName`, `symbolType`, `filePath`, `targetDirectory`, `withReferences` |
+| `get_symbol_definition` | Retrieves exact source code, precise line range (StartLine to EndLine), signature, and doc comments for a symbol. Accepts `withReferences: true` to include incoming call sites. Reads dirty buffer if unsaved changes exist on disk. Automatically scopes to active project index. | `symbolName`, `symbolType`, `filePath`, `targetDirectory`, `withReferences` |
 | `find_symbol_callers` | Queries symbol reference graph to find all caller invocations across the project. | `symbolName`, `targetDirectory` |
-| `search_codebase_graph` | Wildcard symbol pattern search (`%`) with type and language filtering. | `pattern`, `symbolType`, `language`, `targetDirectory` |
+| `search_codebase_graph` | Wildcard symbol pattern search (`%`) with type and language filtering. Supports `exactMatch: true` for exact symbol name matching and `regex: "..."` filtering. Auto-scopes to workspace. | `pattern`, `symbolType`, `language`, `targetDirectory`, `exactMatch`, `regex` |
+| `get_supported_languages` | Discovers supported file extensions and language parsers actively enabled on the CodeGraphMcp server. | *None* |
 | `get_diff_impact` | Analyzes git diffs and dirty buffer to evaluate blast radius before refactoring. | `sinceCommit`, `targetDirectory` |
 | `get_servicestack_dto_contract` | Resolves cross-stack C# DTO -> TypeScript interface -> Angular component mappings. | `dtoName`, `targetDirectory` |
 

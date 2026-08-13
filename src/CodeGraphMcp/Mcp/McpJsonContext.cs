@@ -19,6 +19,9 @@ namespace CodeGraphMcp.Mcp;
 [JsonSerializable(typeof(DtoContractResult))]
 [JsonSerializable(typeof(CallerEntry))]
 [JsonSerializable(typeof(List<CallerEntry>))]
+[JsonSerializable(typeof(SupportedLanguagesResult))]
+[JsonSerializable(typeof(SupportedLanguageInfo))]
+[JsonSerializable(typeof(List<SupportedLanguageInfo>))]
 // primitive / built-ins used as tool parameters and inside records
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(bool))]
