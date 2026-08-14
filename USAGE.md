@@ -49,7 +49,7 @@ The `index` command scans source files, extracts symbols (classes, interfaces, m
 ### Usage
 ```powershell
 # Using dotnet run
-dotnet run --project src/CodeGraphMcp -- index "C:\path\to\your\repository"
+dotnet run --project src/CodeGraphMcp.Cli -- index "C:\path\to\your\repository"
 
 # Using published binary
 .\publish\cli\CodeGraphMcp.Cli.exe index "C:\path\to\your\repository"
@@ -78,10 +78,10 @@ The `query` command searches for symbol definitions by name across the indexed c
 
 ```powershell
 # Query current directory
-dotnet run --project src/CodeGraphMcp -- query "IndexOrchestrator"
+dotnet run --project src/CodeGraphMcp.Cli -- query "IndexOrchestrator"
 
 # Query a specific project directory from anywhere with incoming references/call sites
-dotnet run --project src/CodeGraphMcp -- query "Individual" --repo "D:\Work\Clever Services\21959" --referenced
+dotnet run --project src/CodeGraphMcp.Cli -- query "Individual" --repo "D:\Work\Clever Services\21959" --referenced
 
 # Or using the published binary with --with-references alias
 .\publish\cli\CodeGraphMcp.Cli.exe query "MyClass" -r "C:\Projects\MyOtherApp" --with-references
@@ -116,7 +116,7 @@ Displays statistics and current state of the knowledge graph database for a repo
 
 ### Usage
 ```powershell
-dotnet run --project src/CodeGraphMcp -- status "C:\path\to\your\repository"
+dotnet run --project src/CodeGraphMcp.Cli -- status "C:\path\to\your\repository"
 ```
 
 ### Sample Output
@@ -140,7 +140,7 @@ Monitors the repository for git changes at a scheduled interval and incrementall
 
 ### Usage
 ```powershell
-dotnet run --project src/CodeGraphMcp -- watch "C:\path\to\your\repository" --interval 30
+dotnet run --project src/CodeGraphMcp.Cli -- watch "C:\path\to\your\repository" --interval 30
 ```
 
 ### Options
@@ -157,7 +157,7 @@ Deletes the SQLite database file and associated Write-Ahead Log (WAL) files for 
 
 ### Usage
 ```powershell
-dotnet run --project src/CodeGraphMcp -- clean "C:\path\to\your\repository" --yes
+dotnet run --project src/CodeGraphMcp.Cli -- clean "C:\path\to\your\repository" --yes
 ```
 
 ### Options
@@ -189,14 +189,14 @@ Starts the Model Context Protocol (MCP) server over standard input/output (stdio
 ### Usage
 
 ```powershell
-# Dynamic unbound mode (resolves repositories on-the-fly)
-dotnet run --project src/CodeGraphMcp -- serve
+# Run MCP daemon server directly
+dotnet run --project src/CodeGraphMcp.Server
 
-# Bound mode targeting a specific repository
-dotnet run --project src/CodeGraphMcp -- serve -r "C:\path\to\your\repository"
+# Run bound to a specific repository
+dotnet run --project src/CodeGraphMcp.Server -- --repo "C:\path\to\your\repository"
 
-# Using published binary
-.\publish\cli\CodeGraphMcp.Cli.exe serve -r "C:\path\to\your\repository"
+# Using published server binary
+.\publish\server\CodeGraphMcp.Server.exe
 ```
 
 ### Command Options

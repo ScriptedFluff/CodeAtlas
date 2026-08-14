@@ -7,55 +7,42 @@
 ## 1. Core Architecture & Subsystems Overview
 
 ```
-                          ┌──────────────────────────┐
-                          │   CLI / MCP Interface    │
-                          └─────────────┬────────────┘
-                                        │
-             ┌──────────────────────────┼──────────────────────────┐
-             ▼                          ▼                          ▼
-   ┌──────────────────┐       ┌──────────────────┐       ┌──────────────────┐
-   │ CLI Command Loop │       │ Stdio MCP Server │       │  Watcher Service │
-   └─────────┬────────┘       └─────────┬────────┘       └─────────┬────────┘
-             │                          │                          │
-             └──────────────────────────┼──────────────────────────┘
-                                        ▼
-                           ┌────────────────────────┐
-                           │   Index Orchestrator   │
-                           └───────────┬────────────┘
-                                       │
-            ┌──────────────────────────┼──────────────────────────┐
-            ▼                          ▼                          ▼
- ┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
- │ Git Delta Analyzer  │    │ AST Parser Pipeline │    │ Uncommitted Buffer  │
- │ (HEAD tracking)     │    │ (Roslyn/TreeSitter) │    │  (Dirty file sync)  │
- └──────────┬──────────┘    └──────────┬──────────┘    └──────────┬──────────┘
-            │                          │                          │
-            └──────────────────────────┼──────────────────────────┘
-                                       ▼
-                         ┌──────────────────────────┐
-                         │  SQLite Knowledge Graph  │
-                         │    (WAL + Dapper DB)     │
-                         └──────────────────────────┘
+CodeGraphMcp.slnx
+├── src/
+│   ├── CodeGraphMcp.Core/         # Class Library (.dll) - Domain logic & indexing engine
+│   │   ├── Config/                # CodeGraphSettings, StorageConfig, WorkspacePathResolver
+│   │   ├── Db/                    # SqliteDbFactory, Schema Migrations, Symbol Repositories, WorktreePruner
+│   │   ├── Indexer/               # IndexOrchestrator, SolutionRootResolver, DynamicWorkspaceService
+│   │   ├── Parser/                # C#, TS/JS, HTML, CSS, JSON, YAML, PowerShell Parsers
+│   │   ├── Git/                   # GitHelpers, DeltaEngine, DirtyFileBuffer, GitIgnoreMatcher
+│   │   ├── CrossStack/            # ServiceStack DTO Contract Resolver & Linkers
+│   │   └── Models/                # Symbol, SymbolReference, IndexResult, CallerEntry
+│   │
+│   ├── CodeGraphMcp.Server/       # Executable (.exe) - MCP Daemon Host (Native AOT)
+│   │   ├── Mcp/                   # 7 MCP Tool Registrations & JSON-RPC Dispatcher
+│   │   └── Program.cs             # Entry point for stdio MCP daemon host
+│   │
+│   └── CodeGraphMcp.Cli/          # Executable (.exe) - Command Line Utility (Native AOT)
+│       ├── Commands/              # IndexCommand, QueryCommand, StatusCommand, PruneCommand, WatchCommand
+│       └── Program.cs             # Entry point for CLI command runner
 ```
 
-### Core Architecture Components
+### Decoupled Subsystem Responsibilities
 
-1. **AST Parsing Pipeline (`CodeGraphMcp.Parser`)**:
-   - **C#**: Roslyn-backed syntax walker extracting classes, interfaces, structs, enums, methods, properties, and invocation expressions.
-   - **TypeScript/JavaScript**: Tree-sitter / custom AST lexer extracting functions, classes, exports, interfaces, and call graphs.
-   - **HTML**: DOM node scanner indexing element IDs, component tags, and input controls.
-   - **PowerShell**: Abstract Syntax Tree (`System.Management.Automation.Language`) visitor extracting functions, parameters, and invocation chains.
-2. **Git Delta Tracker (`CodeGraphMcp.Git`)**:
-   - Interrogates `git diff` against saved index commit hash (`last_indexed_commit`).
-   - Limits re-indexing to modified, added, or deleted files, avoiding full re-scans.
-3. **Relational Knowledge Graph (`CodeGraphMcp.Db`)**:
-   - SQLite engine operating with Write-Ahead Logging (`WAL` mode) and pragma optimizations via `Dapper`.
-   - Indexed tables for `files`, `symbols`, `references`, and `dto_mappings`.
-4. **Live Dirty Buffer Interceptor**:
-   - When executing symbol or reference queries via MCP or CLI, uncommitted edits on disk override stale SQLite records in memory for zero-latency accuracy.
-5. **Model Context Protocol Server (`CodeGraphMcp.Mcp`)**:
-   - Implements JSON-RPC 2.0 over standard I/O streams (`stdio`).
-   - Exposes specialized knowledge graph tools directly to LLMs (Claude, AGY/Antigravity, Cursor, Copilot).
+1. **Core Domain Library (`CodeGraphMcp.Core`)**:
+   - **AST Parsing Pipeline**: Roslyn C# parser, Tree-sitter parsers (TS/JS, HTML, CSS, JSON, YAML), and PowerShell AST parser.
+   - **Git Delta Tracker**: `git diff` interrogation against `last_indexed_commit` for sub-second incremental indexing.
+   - **Relational Knowledge Graph**: SQLite WAL-mode repository layer (`Dapper`) storing symbol definitions, references, and DTO mappings.
+   - **Live Dirty Buffer Interceptor**: Merges uncommitted file edits on disk with SQLite records for zero-latency accuracy.
+   - **Worktree Pruner**: Orphaned database purge utility reclaiming disk space.
+
+2. **MCP Daemon Host (`CodeGraphMcp.Server`)**:
+   - Implements JSON-RPC 2.0 over standard I/O streams (`stdio`) via `ModelContextProtocol.Server`.
+   - Exposes 7 specialized knowledge graph tools directly to AI assistants (Antigravity, Claude Desktop, Cursor, Copilot).
+
+3. **CLI Utility Launcher (`CodeGraphMcp.Cli` / `cg`)**:
+   - Light command-line utility built on `System.CommandLine`.
+   - Executes `index`, `query`, `status`, `watch`, `clean`, and `prune` commands. Delegated `serve` launches `CodeGraphMcp.Server`.
 
 ---
 
