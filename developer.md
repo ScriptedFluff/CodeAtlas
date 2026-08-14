@@ -30,11 +30,13 @@ CodeGraphMcp.slnx
 ### Decoupled Subsystem Responsibilities
 
 1. **Core Domain Library (`CodeGraphMcp.Core`)**:
-   - **AST Parsing Pipeline**: Roslyn C# parser, Tree-sitter parsers (TS/JS, HTML, CSS, JSON, YAML), and PowerShell AST parser.
-   - **Git Delta Tracker**: `git diff` interrogation against `last_indexed_commit` for sub-second incremental indexing.
-   - **Relational Knowledge Graph**: SQLite WAL-mode repository layer (`Dapper`) storing symbol definitions, references, and DTO mappings.
-   - **Live Dirty Buffer Interceptor**: Merges uncommitted file edits on disk with SQLite records for zero-latency accuracy.
-   - **Worktree Pruner**: Orphaned database purge utility reclaiming disk space.
+    - **AST Parsing & Streaming Indexing Pipeline**: Roslyn C# parser, Tree-sitter parsers (TS/JS, HTML, CSS, JSON, YAML), and PowerShell AST parser. Uses a `Channel`-based Producer-Consumer pipeline to stream parsed AST results asynchronously from parallel CPU workers to a background SQLite writer task in 250-file batches without CPU idle time.
+    - **Language Normalizer**: Maps query language aliases (`ps1`, `ps`, `cs`, `c#`, `ts`, `js`, `py`, `yml`) to canonical language strings (`powershell`, `csharp`, `typescript`, `javascript`, `python`, `yaml`).
+    - **Git Delta Tracker**: `git diff` interrogation against `last_indexed_commit` for sub-second incremental indexing.
+    - **Relational Knowledge Graph**: SQLite WAL-mode repository layer (`Dapper`) storing symbol definitions, references, and DTO mappings.
+    - **Live Dirty Buffer Interceptor**: Merges uncommitted file edits on disk with SQLite records for zero-latency accuracy.
+    - **Worktree Pruner**: Orphaned database purge utility reclaiming disk space.
+    - **Default Ignore Rules**: Automatically excludes `.codegraph`, `node_modules`, `bin`, `obj`, `dist`, `.next`, `coverage`, `.vs`, `packages`, `publish`, `out`, `temp`, `tmp`, `vendor`, `.idea`, `lib`, and `wwwroot/lib` (plus `**/wwwroot/lib/**`).
 
 2. **MCP Daemon Host (`CodeGraphMcp.Server`)**:
    - Implements JSON-RPC 2.0 over standard I/O streams (`stdio`) via `ModelContextProtocol.Server`.
@@ -51,7 +53,7 @@ CodeGraphMcp.slnx
 ### 2.1 Index Command (`index`)
 Parses, indexes, and builds symbol/reference graphs for a target repository.
 
-- **Developer Context**: Executes file discovery, runs multi-threaded AST parsing, calculates content hash fingerprints, resolves internal cross-references, and commits symbol trees to the SQLite store.
+- **Developer Context**: Executes file discovery, runs multi-threaded AST parsing via parallel CPU workers, streams parsed AST payloads through an in-memory `Channel` to a background SQLite writer task (250-file batches), resolves internal cross-references against `SymbolLookupCache`, and commits symbol trees to the SQLite store.
 - **Incremental Logic**: Performs git commit inspection. If HEAD equals `last_indexed_commit` and no uncommitted files exist, execution terminates instantly (<20ms).
 - **Execution Options**:
   - `<repo-path>` *(Required)*: Target repository directory.

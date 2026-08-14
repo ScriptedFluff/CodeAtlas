@@ -45,14 +45,14 @@ Queries the `symbol_references` graph table to return caller function names, fil
 ```
 
 ### `search_codebase_graph`
-Searches symbol names with automatic substring matching (plain `'GetUser'` matches `GetUserService`, `GetUserModel`, etc.). Optional `%` wildcards, `symbolType` (`Class`, `Method`, `Interface`, `Property`, `Enum`, `Function`), and `language` (`csharp`, `typescript`, `html`, `powershell`) filters are supported.
+Searches symbol names with automatic substring matching (plain `'GetUser'` matches `GetUserService`, `GetUserModel`, etc.). Optional `%` wildcards, `symbolType` (`Class`, `Method`, `Interface`, `Property`, `Enum`, `Function`), and `language` (`csharp`, `typescript`, `html`, `powershell`, `json`, `yaml`, `css`) filters are supported with automatic alias normalization (`ps1`, `cs`, `c#`, `ts`, `js`, `py`, `yml`).
 Supports `exactMatch: true` for exact symbol matching, `regex: "..."` for pattern filtering, and `limit: 20` (pass higher limit or 0 for expanded/unlimited up to 500 max cap).
 Results are automatically sorted by structural relevance (exact matches & type definitions first). Automatically scopes to active project index. Returns precise `StartLine` and `EndLine` ranges for targeted file reading.
 ```json
 {
   "pattern": "GetUser",
   "exactMatch": true,
-  "language": "csharp"
+  "language": "ps1"
 }
 ```
 

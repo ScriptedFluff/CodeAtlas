@@ -102,9 +102,6 @@ dotnet run --project src/CodeGraphMcp.Server -- --repo "C:\path\to\repo"
 
 ## 4. Agent Best Practices
 
-Supports `exactMatch: true` for exact symbol matching, `regex: "..."` for pattern filtering, and `limit: 20` (pass higher limit or 0 for expanded/unlimited up to 500 max cap).
-Results are automatically sorted by structural relevance (exact matches & type definitions first). Automatically scopes to active project index. Returns precise `StartLine` and `EndLine` ranges for targeted file reading.
-
 1. **Prefer `get_symbol_definition` Over Large File Reads**: To save context window budget, query symbol definitions directly instead of reading full 1000+ line source files.
 2. **Check Diff Impact Before Refactoring**: Always run `get_diff_impact` to identify all modified/dirty files and total affected symbol counts before making structural code changes.
 3. **Substrings Match Automatically (Do Not Add `%`)**: Pass plain text query terms (e.g. `'UserService'`); substring matching is automatic. Do not add `%` unless custom SQL wildcard placement is explicitly required.

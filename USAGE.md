@@ -64,9 +64,9 @@ dotnet run --project src/CodeGraphMcp.Cli -- index "C:\path\to\your\repository"
 | `--force-full` | — | Bypass git delta detection and re-parse/re-index every file. |
 | `--no-ignore` | — | Bypass `.gitignore` rules and index all matching source files. |
 
-### Incremental Delta Indexing
-- If the repository is a **Git repository**, `CodeGraphMcp` records the HEAD commit hash.
-- Subsequent `index` runs inspect `git diff` against the recorded commit and **only re-parse changed or added files**, resulting in sub-100ms updates.
+### Incremental Delta Indexing & Streaming Pipeline
+- **Git Delta Engine**: If the repository is a **Git repository**, `CodeGraphMcp` records the HEAD commit hash. Subsequent `index` runs inspect `git diff` against the recorded commit and **only re-parse changed or added files**, resulting in sub-100ms updates.
+- **Streaming Producer-Consumer Pipeline**: AST parsers run in parallel across CPU cores, streaming results through an in-memory `Channel` to a dedicated background database writer task that bulk-inserts 250-file symbol batches asynchronously while parsing continues without CPU idle time.
 
 ---
 
@@ -305,9 +305,10 @@ Scans the global index storage cache for database files whose repository roots o
    - **`Ignore` Wildcard Warnings**: If `"Ignore"` contains wildcard `"*"` or `"**"`, `CodeGraphMcp` emits an explicit console warning (`Ignore configuration contains wildcard '*' — all files have been filtered out`) to prevent confusion when 0 files are indexed.
 
 3. **Global Application Config (`appsettings.json`)**:
-   Built-in defaults inside `appsettings.json` ignore common package lockfiles and output directories by default:
-   - **Default Ignore Patterns**: `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `*.min.json`, `*.min.js`, `*.min.css`, `*.map`.
-   - **Default Ignore Directories**: `.codegraph`, `node_modules`, `bin`, `obj`, `dist`, `.next`, `coverage`, `.vs`, `packages`, `publish`.
+   Built-in defaults inside `AppConfig` ignore common package lockfiles, output directories, and vendor asset folders like `wwwroot/lib` by default:
+   - **Default Ignore Patterns**: `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `*.min.json`, `*.min.js`, `*.min.css`, `*.map`, `**/wwwroot/lib/**`, `**/wwwroot/lib/*`.
+   - **Default Ignore Directories**: `.codegraph`, `node_modules`, `bin`, `obj`, `dist`, `.next`, `coverage`, `.vs`, `packages`, `publish`, `out`, `temp`, `tmp`, `vendor`, `.idea`, `lib`, `wwwroot/lib`.
+   - **Language Alias Normalization**: Queries filtering by `--lang` automatically normalize language aliases (e.g. `ps1`/`ps`/`powershell`, `cs`/`c#`/`csharp`, `ts`/`typescript`, `js`/`javascript`, `py`/`python`, `yml`/`yaml`).
 
 4. **Config Loading Hierarchy**:
    - `.codegraph/settings.json` (Repository .codegraph directory)
