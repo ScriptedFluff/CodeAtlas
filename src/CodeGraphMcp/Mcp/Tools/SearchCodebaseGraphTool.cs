@@ -28,19 +28,18 @@ public sealed class SearchCodebaseGraphTool(
 {
     [McpServerTool]
     [Description("""
-        Searches the codebase knowledge graph for symbols matching a name pattern.
+        Searches the codebase knowledge graph for symbols matching a name query.
         Automatically scopes to the current active workspace project index without needing manual directory restrictions.
         Returns matching symbols with file path, precise StartLine and EndLine range, symbol type, language, and doc comments. Use line ranges for targeted file reading.
         Includes live uncommitted symbols from the dirty file buffer. Results are sorted by structural relevance (exact match, types, methods, properties).
-        Use % as a wildcard: 'User%' matches UserService, UserModel, etc.
-        Exact names also work: 'IndexOrchestrator' returns only that symbol.
+        Substrings match automatically: searching 'User' finds UserService, UserModel, GetUser, etc. Do NOT add '%' unless custom wildcard matching is required.
         Use exactMatch: true to match symbol names exactly (case-insensitive).
         Use regex: "..." to apply regular expression filtering on symbol names.
         Use limit: 20 (or higher, or 0 for expanded/unlimited up to 500 max cap) to control the result count limit.
         Use offset: 0 (or skip N) to paginate through search results.
         """)]
     public async Task<SearchResult> SearchCodebaseGraphAsync(
-        [Description("Symbol name pattern. Use % as wildcard (SQL LIKE style).")] string pattern,
+        [Description("Symbol name query (e.g. 'UserService' or 'User'). Substrings match automatically; % wildcards are optional.")] string pattern,
         [Description("Optional: Class, Method, Interface, Property, Enum, Function")] string? symbolType = null,
         [Description("Optional: csharp, typescript, html, powershell")] string? language = null,
         [Description("Optional: target repository/workspace directory to query (defaults to active workspace)")] string? targetDirectory = null,

@@ -45,7 +45,7 @@ Queries the `symbol_references` graph table to return caller function names, fil
 ```
 
 ### `search_codebase_graph`
-Searches symbol names using `%` wildcards with optional `symbolType` (`Class`, `Method`, `Interface`, `Property`, `Enum`, `Function`) and `language` (`csharp`, `typescript`, `html`, `powershell`) filters.
+Searches symbol names with automatic substring matching (plain `'GetUser'` matches `GetUserService`, `GetUserModel`, etc.). Optional `%` wildcards, `symbolType` (`Class`, `Method`, `Interface`, `Property`, `Enum`, `Function`), and `language` (`csharp`, `typescript`, `html`, `powershell`) filters are supported.
 Supports `exactMatch: true` for exact symbol matching, `regex: "..."` for pattern filtering, and `limit: 20` (pass higher limit or 0 for expanded/unlimited up to 500 max cap).
 Results are automatically sorted by structural relevance (exact matches & type definitions first). Automatically scopes to active project index. Returns precise `StartLine` and `EndLine` ranges for targeted file reading.
 ```json
@@ -119,7 +119,8 @@ dotnet run --project src/CodeGraphMcp -- serve -r "C:\path\to\repo"
 
 1. **Automatic Project Workspace Scoping**: Queries automatically scope to the active workspace project database index—no manual path filtering parameters are required.
 2. **Prefer Symbol Definitions & Precise Line Ranges**: To save context budget, use `get_symbol_definition` or `search_codebase_graph` to obtain exact `StartLine` and `EndLine` numbers, performing targeted partial reads instead of reading entire files.
-3. **Use Exact Match & Regex Filtering**: Use `exactMatch: true` on common names like `"Model"` to avoid context noise from matching `UserModel`/`ModelBase`. Use `regex` for custom string patterns.
-4. **Check Diff Impact Before Refactoring**: Always run `get_diff_impact` to identify all modified/dirty files and total affected symbol counts before making structural code changes.
-5. **Dynamic Language Discovery**: Call `get_supported_languages` on session start to verify whether `CodeGraphMcp` covers the target project's language stack.
-6. **Live Dirty Buffer Awareness**: Tools automatically check disk for uncommitted file edits before querying the database, so unsaved work is always reflected in queries.
+3. **Substrings Match Automatically (Do Not Add `%`)**: Pass plain text query terms (e.g. `'UserService'`); substring matching is automatic. Do not add `%` unless custom SQL wildcard placement is explicitly required.
+4. **Use Exact Match & Regex Filtering**: Use `exactMatch: true` on common names like `"Model"` to avoid context noise from matching `UserModel`/`ModelBase`. Use `regex` for custom string patterns.
+5. **Check Diff Impact Before Refactoring**: Always run `get_diff_impact` to identify all modified/dirty files and total affected symbol counts before making structural code changes.
+6. **Dynamic Language Discovery**: Call `get_supported_languages` on session start to verify whether `CodeGraphMcp` covers the target project's language stack.
+7. **Live Dirty Buffer Awareness**: Tools automatically check disk for uncommitted file edits before querying the database, so unsaved work is always reflected in queries.

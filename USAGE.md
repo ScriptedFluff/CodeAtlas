@@ -226,7 +226,7 @@ Queries the symbol reference graph to find all caller invocations across the pro
 #### 3. `search_codebase_graph`
 Searches indexed symbols matching name patterns with optional filters. Automatically scopes to workspace index without requiring explicit path filtering.
 - **Parameters:**
-  - `pattern`: Symbol pattern using `%` wildcards (e.g. `GetUser%`).
+  - `pattern`: Symbol query string (e.g. `UserService` or `User`). Substrings match automatically; `%` wildcards are optional.
   - `symbolType`: Optional type filter.
   - `language`: Optional language filter (`csharp`, `typescript`, `html`, `powershell`, `json`, `yaml`, `css`).
   - `targetDirectory`: Optional workspace root override.

@@ -45,10 +45,10 @@ Queries the `symbol_references` graph table to return caller function names, fil
 ```
 
 ### `search_codebase_graph`
-Searches symbol names using `%` wildcards with optional `symbolType` (`Class`, `Method`, `Interface`, `Property`, `Enum`, `Function`) and `language` (`csharp`, `typescript`, `html`, `powershell`) filters.
+Searches symbol names with automatic substring matching (plain `'GetUser'` matches `GetUserService`, `GetUserModel`, etc.). Optional `%` wildcards, `symbolType` (`Class`, `Method`, `Interface`, `Property`, `Enum`, `Function`), and `language` (`csharp`, `typescript`, `html`, `powershell`) filters are supported.
 ```json
 {
-  "pattern": "Get%User",
+  "pattern": "GetUser",
   "language": "csharp"
 }
 ```
@@ -107,5 +107,5 @@ Results are automatically sorted by structural relevance (exact matches & type d
 
 1. **Prefer `get_symbol_definition` Over Large File Reads**: To save context window budget, query symbol definitions directly instead of reading full 1000+ line source files.
 2. **Check Diff Impact Before Refactoring**: Always run `get_diff_impact` to identify all modified/dirty files and total affected symbol counts before making structural code changes.
-3. **Use Wildcards (`%`) for Partial Names**: When exact symbol names are unknown, use `search_codebase_graph` with `%` wildcards (e.g., `Db%Manager` or `%Handler`).
+3. **Substrings Match Automatically (Do Not Add `%`)**: Pass plain text query terms (e.g. `'UserService'`); substring matching is automatic. Do not add `%` unless custom SQL wildcard placement is explicitly required.
 4. **Live Dirty Buffer Awareness**: Tools automatically check disk for uncommitted file edits before querying the database, so unsaved work is always reflected in queries.

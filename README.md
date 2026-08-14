@@ -106,7 +106,7 @@ To connect `CodeGraphMcp` to your AI coding assistant (Antigravity, Claude Deskt
 AI assistants receive 7 specialized code-graph tools:
 1. `get_symbol_definition`: Get exact source snippet, signature, doc comment, and line numbers (`StartLine`–`EndLine`).
 2. `find_symbol_callers`: Find all incoming call sites and invocations across solution boundaries.
-3. `search_codebase_graph`: Search symbols with wildcards (`%`), regex post-filtering, type/language filters, and pagination (`limit`, `offset`).
+3. `search_codebase_graph`: Search symbols with automatic substring matching (or optional `%` wildcards), regex post-filtering, type/language filters, and pagination (`limit`, `offset`).
 4. `get_supported_languages`: Discover supported extensions and active AST parsers.
 5. `get_diff_impact`: Analyze git diffs & dirty buffer to compute blast radius before refactoring.
 6. `get_servicestack_dto_contract`: Resolve C# DTO -> TypeScript interface -> Angular component endpoints.
