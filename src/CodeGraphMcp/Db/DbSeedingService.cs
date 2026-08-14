@@ -69,9 +69,6 @@ public static class DbSeedingService
             var localDb = Path.Combine(gitRoot, ".codegraph", "code_graph.db");
             if (File.Exists(localDb)) set.Add(localDb);
 
-            var legacyLocalDb = Path.Combine(gitRoot, ".agent-index", "code_graph.db");
-            if (File.Exists(legacyLocalDb)) set.Add(legacyLocalDb);
-
             // Also check sibling worktrees under git root parent if applicable
             var parentDir = Path.GetDirectoryName(gitRoot);
             if (parentDir is not null && Directory.Exists(parentDir))
@@ -82,9 +79,6 @@ public static class DbSeedingService
                     {
                         var siblingDb = Path.Combine(sub, ".codegraph", "code_graph.db");
                         if (File.Exists(siblingDb)) set.Add(siblingDb);
-
-                        var siblingLegacyDb = Path.Combine(sub, ".agent-index", "code_graph.db");
-                        if (File.Exists(siblingLegacyDb)) set.Add(siblingLegacyDb);
                     }
                 }
                 catch { }

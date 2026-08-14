@@ -31,6 +31,8 @@ public static class CommandFactory
             using var db = new CodeGraphDb(dbPath);
             db.Migrate();
 
+            Console.WriteLine($"Database:         {dbPath}");
+
             if (force || !GitHelpers.IsGitRepo(normRepo))
             {
                 var orchestrator = new IndexOrchestrator(db);

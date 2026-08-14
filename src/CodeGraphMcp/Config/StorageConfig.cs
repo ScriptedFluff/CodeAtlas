@@ -26,13 +26,9 @@ public static class StorageConfig
 
         var localDbPath = Path.Combine(normalisedRepo, ".codegraph", "code_graph.db");
 
-        // Check if existing local DB file exists in target directory (.codegraph or legacy .agent-index)
+        // Check if existing local DB file exists in target directory
         if (File.Exists(localDbPath))
             return localDbPath;
-
-        var legacyLocalDbPath = Path.Combine(normalisedRepo, ".agent-index", "code_graph.db");
-        if (File.Exists(legacyLocalDbPath))
-            return legacyLocalDbPath;
 
         // Check if existing local DB file exists in parent git root (if repoPath is a subdirectory)
         var gitRoot = GitHelpers.FindGitRoot(normalisedRepo);
@@ -41,10 +37,6 @@ public static class StorageConfig
             var gitRootLocalDbPath = Path.Combine(gitRoot, ".codegraph", "code_graph.db");
             if (File.Exists(gitRootLocalDbPath))
                 return gitRootLocalDbPath;
-
-            var gitRootLegacyDbPath = Path.Combine(gitRoot, ".agent-index", "code_graph.db");
-            if (File.Exists(gitRootLegacyDbPath))
-                return gitRootLegacyDbPath;
         }
 
         // Default: Create local repository database inside .codegraph directory
