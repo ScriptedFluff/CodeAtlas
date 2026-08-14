@@ -5,7 +5,7 @@ namespace CodeGraphMcp.Parser;
 
 public sealed partial class HtmlParser : ILanguageParser
 {
-    public IReadOnlyList<string> FileExtensions => [".html", ".htm", ".xml", ".csproj", ".config", ".vcxproj", ".props"];
+    public IReadOnlyList<string> FileExtensions => [".html", ".htm", ".cshtml", ".razor", ".xml", ".csproj", ".config", ".vcxproj", ".props"];
     public string Language => "html";
 
     [GeneratedRegex(@"<(?<name>[a-zA-Z0-9_\-\.\:]+)", RegexOptions.Compiled)]
@@ -32,7 +32,7 @@ public sealed partial class HtmlParser : ILanguageParser
                 var group = match.Groups["name"];
                 if (group.Success && !group.Value.StartsWith("!"))
                 {
-                    AddSymbol(group, SymbolType.Class, i, currentByteOffset);
+                    AddSymbol(group.Value, group.Index, group.Length, SymbolType.Class, i, currentByteOffset);
                 }
             }
 
@@ -41,7 +41,21 @@ public sealed partial class HtmlParser : ILanguageParser
                 var group = match.Groups["val"];
                 if (group.Success && !string.IsNullOrWhiteSpace(group.Value))
                 {
-                    AddSymbol(group, SymbolType.Property, i, currentByteOffset);
+                    var val = group.Value;
+                    AddSymbol(val, group.Index, group.Length, SymbolType.Property, i, currentByteOffset);
+
+                    if (val.Contains(' '))
+                    {
+                        var parts = val.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                        foreach (var part in parts)
+                        {
+                            if (!string.IsNullOrWhiteSpace(part) && part != val)
+                            {
+                                int partIdx = group.Index + val.IndexOf(part, StringComparison.Ordinal);
+                                AddSymbol(part, partIdx, part.Length, SymbolType.Property, i, currentByteOffset);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -50,15 +64,14 @@ public sealed partial class HtmlParser : ILanguageParser
 
         return symbols;
 
-        void AddSymbol(Group group, SymbolType symbolType, int lineIdx, int lineByteOffset)
+        void AddSymbol(string name, int index, int length, SymbolType symbolType, int lineIdx, int lineByteOffset)
         {
-            var symbolName = group.Value;
-            var startByte = lineByteOffset + group.Index;
-            var endByte = startByte + group.Length;
+            var startByte = lineByteOffset + index;
+            var endByte = startByte + length;
 
             symbols.Add(new Symbol
             {
-                SymbolName = symbolName,
+                SymbolName = name,
                 SymbolType = symbolType,
                 Language = Language,
                 FilePath = filePath,
@@ -73,4 +86,3 @@ public sealed partial class HtmlParser : ILanguageParser
         }
     }
 }
-

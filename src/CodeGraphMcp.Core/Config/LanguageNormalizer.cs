@@ -14,7 +14,7 @@ public static class LanguageNormalizer
             "ts" or "typescript" => "typescript",
             "js" or "javascript" => "javascript",
             "py" or "python" => "python",
-            "html" or "htm" => "html",
+            "html" or "htm" or "cshtml" or "razor" => "html",
             "css" => "css",
             "json" => "json",
             "yml" or "yaml" => "yaml",

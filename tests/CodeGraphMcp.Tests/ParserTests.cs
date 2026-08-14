@@ -214,6 +214,28 @@ public class HtmlParserTests
         Assert.Contains(".xml", Parser.FileExtensions);
         Assert.Contains(".csproj", Parser.FileExtensions);
         Assert.Contains(".config", Parser.FileExtensions);
+        Assert.Contains(".cshtml", Parser.FileExtensions);
+        Assert.Contains(".razor", Parser.FileExtensions);
+    }
+
+    [Fact]
+    public void Parse_RazorPage_ExtractsIndividualClassSymbolsAndElements()
+    {
+        var razorSource = """
+        @page "/dashboard"
+        <div class="card btn-container">
+            <button id="submitBtn" class="btn btn-primary btn-sm">Submit</button>
+        </div>
+        """;
+
+        var symbols = Parser.Parse("Views/Dashboard.cshtml", razorSource).ToList();
+
+        Assert.Contains(symbols, s => s.SymbolName == "button" && s.SymbolType == SymbolType.Class);
+        Assert.Contains(symbols, s => s.SymbolName == "submitBtn" && s.SymbolType == SymbolType.Property);
+        Assert.Contains(symbols, s => s.SymbolName == "btn" && s.SymbolType == SymbolType.Property);
+        Assert.Contains(symbols, s => s.SymbolName == "btn-primary" && s.SymbolType == SymbolType.Property);
+        Assert.Contains(symbols, s => s.SymbolName == "btn-sm" && s.SymbolType == SymbolType.Property);
+        Assert.Contains(symbols, s => s.SymbolName == "btn btn-primary btn-sm" && s.SymbolType == SymbolType.Property);
     }
 }
 
