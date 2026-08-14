@@ -13,7 +13,8 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
     {
         ".git", ".codegraph", "bin", "obj",
         "node_modules", "dist", ".next", "coverage", ".vs",
-        "packages", "TestResults", "publish", "out", "temp", "tmp", "vendor", ".idea"
+        "packages", "TestResults", "publish", "out", "temp", "tmp", "vendor", ".idea",
+        "lib", "wwwroot/lib"
     };
 
     private readonly Dictionary<string, ILanguageParser> _extensionMap = BuildExtensionMap();
@@ -225,7 +226,11 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
             foreach (var sub in Directory.GetDirectories(dir))
             {
                 var dirName = Path.GetFileName(sub);
-                if (ignoredDirs.Contains(dirName))
+                var relSub = WorkspacePathNormalizer.NormalizeRelativePath(root, sub).Replace('\\', '/');
+
+                if (ignoredDirs.Contains(dirName) ||
+                    relSub.Equals("wwwroot/lib", StringComparison.OrdinalIgnoreCase) ||
+                    relSub.EndsWith("/wwwroot/lib", StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 if (noIgnore || !matcher.IsIgnored(sub, isDirectory: true))

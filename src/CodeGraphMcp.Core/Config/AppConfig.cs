@@ -11,13 +11,16 @@ public sealed class AppConfig
         "*.min.json",
         "*.min.js",
         "*.min.css",
-        "*.map"
+        "*.map",
+        "**/wwwroot/lib/**",
+        "**/wwwroot/lib/*"
     ];
 
     public List<string> IgnoreDirectories { get; set; } = [
         ".git", ".codegraph", "bin", "obj",
         "node_modules", "dist", ".next", "coverage", ".vs",
-        "packages", "TestResults", "publish", "out", "temp", "tmp", "vendor", ".idea"
+        "packages", "TestResults", "publish", "out", "temp", "tmp", "vendor", ".idea",
+        "lib", "wwwroot/lib"
     ];
 
     public List<string> IncludePatterns { get; set; } = [];

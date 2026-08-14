@@ -13,7 +13,9 @@ public sealed class DirtyFileBuffer(string repoPath, IReadOnlyList<ILanguagePars
     private static readonly HashSet<string> IgnoredDirs = new(StringComparer.OrdinalIgnoreCase)
     {
         ".git", ".codegraph", "bin", "obj", "publish",
-        "node_modules", "dist", ".next", "coverage", ".vs"
+        "node_modules", "dist", ".next", "coverage", ".vs",
+        "packages", "TestResults", "out", "temp", "tmp", "vendor", ".idea",
+        "lib", "wwwroot/lib"
     };
 
     private volatile IReadOnlyDictionary<string, IReadOnlyList<Symbol>> _cache
