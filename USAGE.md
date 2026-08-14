@@ -46,10 +46,10 @@ The `index` command scans source files, extracts symbols (classes, interfaces, m
 ### Usage
 ```powershell
 # Using dotnet run
-dotnet run --project src/CodeGraphMcp -- index "C:\path\to\your\repository" --store-local
+dotnet run --project src/CodeGraphMcp -- index "C:\path\to\your\repository"
 
 # Using published binary
-.\publish\CodeGraphMcp.exe index "C:\path\to\your\repository" --store-local
+.\publish\CodeGraphMcp.exe index "C:\path\to\your\repository"
 ```
 
 ### Command Options
@@ -57,8 +57,7 @@ dotnet run --project src/CodeGraphMcp -- index "C:\path\to\your\repository" --st
 | Flag | Short | Description |
 | :--- | :--- | :--- |
 | `<repo-path>` | — | **Required.** Path to the repository root directory. |
-| `--store-local` | `-l` | Stores SQLite DB inside `<repo-path>/.agent-index/codegraph.db`. |
-| `--db-dir` | — | Override folder location where SQLite database file is created. |
+| `--db-dir` | — | Override folder location where SQLite database file is created (defaults to `<repo>/.codegraph/`). |
 | `--force-full` | — | Bypass git delta detection and re-parse/re-index every file. |
 | `--no-ignore` | — | Bypass `.gitignore` rules and index all matching source files. |
 
@@ -76,13 +75,13 @@ The `query` command searches for symbol definitions by name across the indexed c
 
 ```powershell
 # Query current directory
-dotnet run --project src/CodeGraphMcp -- query "IndexOrchestrator" --store-local
+dotnet run --project src/CodeGraphMcp -- query "IndexOrchestrator"
 
 # Query a specific project directory from anywhere with incoming references/call sites
 dotnet run --project src/CodeGraphMcp -- query "Individual" --repo "D:\Work\Clever Services\21959" --referenced
 
 # Or using the published binary with --with-references alias
-.\publish\CodeGraphMcp.exe query "MyClass" -r "C:\Projects\MyOtherApp" -l --with-references
+.\publish\CodeGraphMcp.exe query "MyClass" -r "C:\Projects\MyOtherApp" --with-references
 ```
 
 ### Command Options
@@ -94,7 +93,6 @@ dotnet run --project src/CodeGraphMcp -- query "Individual" --repo "D:\Work\Clev
 | `--type` | `-t` | Filter results by symbol type (e.g. `Class`, `Method`, `Interface`, `Property`, `Enum`, `Function`). |
 | `--language` | `--lang` | Filter results by programming language (e.g. `csharp`, `typescript`, `html`, `json`, `yaml`, `css`, `powershell`). |
 | `--referenced` | `--with-references` | Display incoming callers/reference sites grouped under matched symbols in an indented tree view. |
-| `--store-local` | `-l` | Uses `.agent-index/codegraph.db` inside the specified target repo root. |
 | `--db-dir` | — | Override directory location where SQLite database file was saved. |
 
 ### Features
@@ -115,13 +113,13 @@ Displays statistics and current state of the knowledge graph database for a repo
 
 ### Usage
 ```powershell
-dotnet run --project src/CodeGraphMcp -- status "C:\path\to\your\repository" --store-local
+dotnet run --project src/CodeGraphMcp -- status "C:\path\to\your\repository"
 ```
 
 ### Sample Output
 ```text
 Repository:       C:\Projects\CodeGraphMcp
-Database:         C:\Projects\CodeGraphMcp\.agent-index\codegraph.db
+Database:         C:\Projects\CodeGraphMcp\.codegraph\code_graph.db
 Branch:           main
 HEAD:             a1b2c3d4e5f6
 Last Indexed:     a1b2c3d4e5f6
@@ -139,7 +137,7 @@ Monitors the repository for git changes at a scheduled interval and incrementall
 
 ### Usage
 ```powershell
-dotnet run --project src/CodeGraphMcp -- watch "C:\path\to\your\repository" --store-local --interval 30
+dotnet run --project src/CodeGraphMcp -- watch "C:\path\to\your\repository" --interval 30
 ```
 
 ### Options
@@ -147,7 +145,6 @@ dotnet run --project src/CodeGraphMcp -- watch "C:\path\to\your\repository" --st
 | :--- | :--- |
 | `<repo-path>` | **Required.** Repository root path to watch. |
 | `--interval` | Seconds between index checks (default: `30`). |
-| `--store-local` | Use `.agent-index/codegraph.db` inside repository root. |
 
 ---
 
@@ -157,7 +154,7 @@ Deletes the SQLite database file and associated Write-Ahead Log (WAL) files for 
 
 ### Usage
 ```powershell
-dotnet run --project src/CodeGraphMcp -- clean "C:\path\to\your\repository" --store-local --yes
+dotnet run --project src/CodeGraphMcp -- clean "C:\path\to\your\repository" --yes
 ```
 
 ### Options
@@ -193,10 +190,10 @@ Starts the Model Context Protocol (MCP) server over standard input/output (stdio
 dotnet run --project src/CodeGraphMcp -- serve
 
 # Bound mode targeting a specific repository
-dotnet run --project src/CodeGraphMcp -- serve -r "C:\path\to\your\repository" --store-local
+dotnet run --project src/CodeGraphMcp -- serve -r "C:\path\to\your\repository"
 
 # Using published binary
-.\publish\CodeGraphMcp.exe serve -r "C:\path\to\your\repository" --store-local
+.\publish\CodeGraphMcp.exe serve -r "C:\path\to\your\repository"
 ```
 
 ### Command Options
@@ -204,7 +201,6 @@ dotnet run --project src/CodeGraphMcp -- serve -r "C:\path\to\your\repository" -
 | Flag | Short | Description |
 | :--- | :--- | :--- |
 | `--repo` | `-r` | Optional default target repository directory. If omitted, tools accept an explicit `targetDirectory` parameter or default to the active working directory. |
-| `--store-local` | `-l` | Use `.agent-index/codegraph.db` inside the specified repository root. Requires `--repo`. |
 | `--db-dir` | — | Override folder location for SQLite database files. |
 
 ### MCP Tools Provided
@@ -279,16 +275,15 @@ Scans the global index storage cache for database files whose repository roots o
 
 ## 10. Storage & Configuration Details
 
-- **Default Database Path**: `%LOCALAPPDATA%/CodeGraphMcp/codegraph.db` (if `--store-local` or `--db-dir` are omitted).
-- **Local Database Path (`--store-local`)**: `<repo-root>/.agent-index/codegraph.db`.
+- **Default Database Path**: `<repo-root>/.codegraph/code_graph.db` (unless `--db-dir` override is specified).
 - **Database Engine**: SQLite (managed via `Microsoft.Data.Sqlite` and `Dapper`).
 
 ### Repository & Custom Ignore / Include Configurations
 
-`CodeGraphMcp` automatically loads ignore and include rules from `codegraphmcp.json` or `appsettings.json` to customize indexing targets and exclude heavy auto-generated data, test outputs, or lockfiles:
+`CodeGraphMcp` automatically loads ignore and include rules from `.codegraph/settings.json` or `appsettings.json` to customize indexing targets and exclude heavy auto-generated data, test outputs, or lockfiles:
 
-1. **Repository Root Config (`codegraphmcp.json` or `.codegraphmcp.json`)**:
-   Place a `codegraphmcp.json` in your repository root to declare project-specific include patterns, ignore patterns, or directory exclusions:
+1. **Repository Settings Config (`.codegraph/settings.json`)**:
+   Place a `settings.json` in your repository `.codegraph/` directory to declare project-specific include patterns, ignore patterns, or directory exclusions:
    ```json
    {
      "Include": [
@@ -311,11 +306,10 @@ Scans the global index storage cache for database files whose repository roots o
 3. **Global Application Config (`appsettings.json`)**:
    Built-in defaults inside `appsettings.json` ignore common package lockfiles and output directories by default:
    - **Default Ignore Patterns**: `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `*.min.json`, `*.min.js`, `*.min.css`, `*.map`.
-   - **Default Ignore Directories**: `node_modules`, `bin`, `obj`, `dist`, `.next`, `coverage`, `.vs`, `packages`, `publish`.
+   - **Default Ignore Directories**: `.codegraph`, `node_modules`, `bin`, `obj`, `dist`, `.next`, `coverage`, `.vs`, `packages`, `publish`.
 
 4. **Config Loading Hierarchy**:
-   - `codegraphmcp.json` / `.codegraphmcp.json` (Repository root)
-   - `.codegraph.json` (Repository root)
+   - `.codegraph/settings.json` (Repository .codegraph directory)
    - `appsettings.json` (Repository root or executable output directory)
    - `.gitignore` rules (Git root and subdirectories)
 

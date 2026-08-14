@@ -60,23 +60,23 @@ The compiled executable will be located at `.\publish\CodeGraphMcp.exe`.
 `CodeGraphMcp` operates both as a standalone command-line utility and as an MCP Server (`serve`).
 
 ```powershell
-# 1. Index a repository (stores SQLite database inside <repo>/.agent-index/codegraph.db)
-.\publish\CodeGraphMcp.exe index "C:\Projects\MyRepo" --store-local
+# 1. Index a repository (stores SQLite database inside <repo>/.codegraph/code_graph.db)
+.\publish\CodeGraphMcp.exe index "C:\Projects\MyRepo"
 
 # 2. Query a symbol definition
-.\publish\CodeGraphMcp.exe query "IndexOrchestrator" -r "C:\Projects\MyRepo" -l
+.\publish\CodeGraphMcp.exe query "IndexOrchestrator" -r "C:\Projects\MyRepo"
 
 # 3. Query with type, language, and pagination filters
-.\publish\CodeGraphMcp.exe query "Morningstar" -r "C:\Projects\MyRepo" --lang json --type Property --limit 20 --skip 0 -l
+.\publish\CodeGraphMcp.exe query "Morningstar" -r "C:\Projects\MyRepo" --lang json --type Property --limit 20 --skip 0
 
 # 4. Check index database status & commit state
-.\publish\CodeGraphMcp.exe status "C:\Projects\MyRepo" -l
+.\publish\CodeGraphMcp.exe status "C:\Projects\MyRepo"
 
 # 5. Prune stale worktrees & obsolete index caches to reclaim disk space
 .\publish\CodeGraphMcp.exe prune
 
 # 6. Continuous watcher for auto-reindexing on git commits
-.\publish\CodeGraphMcp.exe watch "C:\Projects\MyRepo" -l --interval 30
+.\publish\CodeGraphMcp.exe watch "C:\Projects\MyRepo" --interval 30
 
 # 7. Start the MCP stdio server for AI assistants
 .\publish\CodeGraphMcp.exe serve
@@ -114,9 +114,9 @@ AI assistants receive 7 specialized code-graph tools:
 
 ---
 
-## ⚙️ Customizing Ignore & Include Rules (`codegraphmcp.json`)
+## ⚙️ Customizing Ignore & Include Rules (`.codegraph/settings.json`)
 
-Place a `codegraphmcp.json` file in your repository root to configure project-specific indexing scope:
+Place a `settings.json` file inside your repository's `.codegraph/` directory to configure project-specific indexing scope:
 
 ```json
 {

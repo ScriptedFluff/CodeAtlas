@@ -27,7 +27,7 @@ public static class WorkspacePathResolver
     }
 
 
-    public static WorkspaceInfo ResolveWorkspace(string? targetDirectory, string? dbDir = null, bool storeLocal = true)
+    public static WorkspaceInfo ResolveWorkspace(string? targetDirectory, string? dbDir = null)
     {
         var target = NormalizePath(targetDirectory ?? Environment.CurrentDirectory);
         if (!Directory.Exists(target) && File.Exists(target))
@@ -36,7 +36,7 @@ public static class WorkspacePathResolver
         }
 
         var workspaceRoot = FindWorkspaceRoot(target);
-        var dbPath = StorageConfig.ResolveDbPath(dbDir, storeLocal, workspaceRoot);
+        var dbPath = StorageConfig.ResolveDbPath(dbDir, workspaceRoot);
 
         return new WorkspaceInfo(target, workspaceRoot, dbPath);
     }
@@ -73,6 +73,10 @@ public static class WorkspacePathResolver
     private static bool HasBoundaryMarker(string dir)
     {
         if (!Directory.Exists(dir)) return false;
+
+        // Check for .codegraph folder
+        if (Directory.Exists(Path.Combine(dir, ".codegraph")))
+            return true;
 
         // Check for .git folder or file (git worktree)
         if (Directory.Exists(Path.Combine(dir, ".git")) || File.Exists(Path.Combine(dir, ".git")))

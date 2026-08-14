@@ -15,7 +15,7 @@ public class CliTests : IDisposable
     {
         _tempRepoDir = Path.Combine(Path.GetTempPath(), $"codegraph_cli_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempRepoDir);
-        _dbPath = Path.Combine(_tempRepoDir, ".agent-index", "code_graph.db");
+        _dbPath = Path.Combine(_tempRepoDir, ".codegraph", "code_graph.db");
         Directory.CreateDirectory(Path.GetDirectoryName(_dbPath)!);
     }
 
@@ -84,7 +84,7 @@ public class CliTests : IDisposable
         }
 
         var root = CommandFactory.CreateRootCommand();
-        var exitCode = await root.InvokeAsync(new[] { "status", _tempRepoDir, "--store-local" });
+        var exitCode = await root.InvokeAsync(new[] { "status", _tempRepoDir });
 
         Assert.Equal(0, exitCode);
     }
@@ -100,7 +100,7 @@ public class CliTests : IDisposable
         Assert.True(File.Exists(_dbPath));
 
         var root = CommandFactory.CreateRootCommand();
-        var exitCode = await root.InvokeAsync(new[] { "clean", _tempRepoDir, "--store-local", "-f" });
+        var exitCode = await root.InvokeAsync(new[] { "clean", _tempRepoDir, "-f" });
 
         Assert.Equal(0, exitCode);
         Assert.False(File.Exists(_dbPath));
@@ -128,28 +128,21 @@ public class CliTests : IDisposable
     }
 
     [Fact]
-    public void ServeCommand_StoreLocalWithoutRepo_OutputsWarning()
+    public void AppConfig_Load_ReadsDotCodegraphSettingsJson()
     {
-        var currentErr = Console.Error;
-        using var sw = new StringWriter();
-        try
-        {
-            Console.SetError(sw);
-            var root = CommandFactory.CreateRootCommand();
-            var parseResult = root.Parse(new[] { "serve", "-l" });
+        var codegraphDir = Path.Combine(_tempRepoDir, ".codegraph");
+        Directory.CreateDirectory(codegraphDir);
+        var settingsPath = Path.Combine(codegraphDir, "settings.json");
+        File.WriteAllText(settingsPath, @"{
+            ""IgnoreDirectories"": [""custom_built""],
+            ""IgnorePatterns"": [""*.generated.cs""]
+        }");
 
-            Assert.Empty(parseResult.Errors);
+        var config = CodeGraphMcp.Config.AppConfig.Load(_tempRepoDir);
 
-            var repoVal = parseResult.GetValueForOption((Option<DirectoryInfo?>)root.Subcommands.First(c => c.Name == "serve").Options.First(o => o.Name == "repo"));
-            var storeLocalVal = parseResult.GetValueForOption((Option<bool>)root.Subcommands.First(c => c.Name == "serve").Options.First(o => o.Name == "store-local"));
-
-            Assert.Null(repoVal);
-            Assert.True(storeLocalVal);
-        }
-        finally
-        {
-            Console.SetError(currentErr);
-        }
+        Assert.Contains("custom_built", config.IgnoreDirectories);
+        Assert.Contains("*.generated.cs", config.IgnorePatterns);
+        Assert.Contains(".codegraph", config.IgnoreDirectories);
     }
 
     [Fact]
@@ -183,7 +176,7 @@ public class CliTests : IDisposable
         {
             Console.SetOut(sw);
             var root = CommandFactory.CreateRootCommand();
-            var exitCode = await root.InvokeAsync(new[] { "query", "MyTarget", "-r", _tempRepoDir, "--store-local", "--referenced" });
+            var exitCode = await root.InvokeAsync(new[] { "query", "MyTarget", "-r", _tempRepoDir, "--referenced" });
 
             Assert.Equal(0, exitCode);
             var output = sw.ToString();

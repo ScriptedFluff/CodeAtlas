@@ -20,7 +20,7 @@ public sealed class DeltaEngineTests : IDisposable
         {
             RunGit(_tempRepo, "config user.email test@test.com");
             RunGit(_tempRepo, "config user.name Test");
-            File.WriteAllText(Path.Combine(_tempRepo, ".gitignore"), "*.db\n*.db-*\n.agent-index/\n");
+            File.WriteAllText(Path.Combine(_tempRepo, ".gitignore"), "*.db\n*.db-*\n.codegraph/\n");
             RunGit(_tempRepo, "add -A");
             RunGit(_tempRepo, "commit -m gitignore");
         }

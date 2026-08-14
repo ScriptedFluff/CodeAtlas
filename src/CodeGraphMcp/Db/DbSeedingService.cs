@@ -66,8 +66,11 @@ public static class DbSeedingService
         var gitRoot = GitHelpers.FindGitRoot(repoPath);
         if (gitRoot is not null)
         {
-            var localDb = Path.Combine(gitRoot, ".agent-index", "code_graph.db");
+            var localDb = Path.Combine(gitRoot, ".codegraph", "code_graph.db");
             if (File.Exists(localDb)) set.Add(localDb);
+
+            var legacyLocalDb = Path.Combine(gitRoot, ".agent-index", "code_graph.db");
+            if (File.Exists(legacyLocalDb)) set.Add(legacyLocalDb);
 
             // Also check sibling worktrees under git root parent if applicable
             var parentDir = Path.GetDirectoryName(gitRoot);
@@ -77,8 +80,11 @@ public static class DbSeedingService
                 {
                     foreach (var sub in Directory.EnumerateDirectories(parentDir))
                     {
-                        var siblingDb = Path.Combine(sub, ".agent-index", "code_graph.db");
+                        var siblingDb = Path.Combine(sub, ".codegraph", "code_graph.db");
                         if (File.Exists(siblingDb)) set.Add(siblingDb);
+
+                        var siblingLegacyDb = Path.Combine(sub, ".agent-index", "code_graph.db");
+                        if (File.Exists(siblingLegacyDb)) set.Add(siblingLegacyDb);
                     }
                 }
                 catch { }

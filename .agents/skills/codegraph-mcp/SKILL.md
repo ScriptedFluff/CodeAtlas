@@ -91,26 +91,26 @@ Scans index cache directories for database files whose original repository folde
 For standalone terminal execution or scripting:
 
 ```powershell
-# 1. Index repository incrementally (stores in .agent-index/codegraph.db)
-dotnet run --project src/CodeGraphMcp -- index "C:\path\to\repo" --store-local
+# 1. Index repository incrementally (stores in .codegraph/code_graph.db)
+dotnet run --project src/CodeGraphMcp -- index "C:\path\to\repo"
 
 # 2. Query symbol by name with optional type, language, limit and skip filters
-dotnet run --project src/CodeGraphMcp -- query "Morningstar" --repo "C:\path\to\repo" --lang json --type Property --limit 20 --skip 0 --store-local
+dotnet run --project src/CodeGraphMcp -- query "Morningstar" --repo "C:\path\to\repo" --lang json --type Property --limit 20 --skip 0
 
 # 3. Check repository index status
-dotnet run --project src/CodeGraphMcp -- status "C:\path\to\repo" --store-local
+dotnet run --project src/CodeGraphMcp -- status "C:\path\to\repo"
 
 # 4. Prune stale worktrees & obsolete index database caches
 dotnet run --project src/CodeGraphMcp -- prune
 
 # 5. Continuous watcher for background re-indexing on git updates
-dotnet run --project src/CodeGraphMcp -- watch "C:\path\to\repo" --store-local --interval 30
+dotnet run --project src/CodeGraphMcp -- watch "C:\path\to\repo" --interval 30
 
 # 6. Clean index database
-dotnet run --project src/CodeGraphMcp -- clean "C:\path\to\repo" --store-local --yes
+dotnet run --project src/CodeGraphMcp -- clean "C:\path\to\repo" --yes
 
 # 7. Run MCP stdio server
-dotnet run --project src/CodeGraphMcp -- serve -r "C:\path\to\repo" --store-local
+dotnet run --project src/CodeGraphMcp -- serve -r "C:\path\to\repo"
 ```
 
 ---

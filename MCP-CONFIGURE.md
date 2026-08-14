@@ -33,7 +33,7 @@ CodeGraphMcp.exe serve
 In this mode, the server is locked to a specific repository path. Every tool query automatically targets this index unless explicitly overridden.
 
 ```powershell
-CodeGraphMcp.exe serve -r "C:\Projects\MyRepo" --store-local
+CodeGraphMcp.exe serve -r "C:\Projects\MyRepo"
 ```
 
 ---
@@ -57,7 +57,7 @@ Add the following entry to your `mcp_config.json`:
 }
 ```
 
-If targeting a fixed repository with local database storage:
+If targeting a fixed repository:
 
 ```json
 {
@@ -67,8 +67,7 @@ If targeting a fixed repository with local database storage:
       "args": [
         "serve",
         "-r",
-        "C:\\Projects\\TargetApp",
-        "-l"
+        "C:\\Projects\\TargetApp"
       ]
     }
   }
@@ -139,7 +138,6 @@ In your MCP settings (`cline_mcp_settings.json`):
 | Argument / Flag | Short | Description |
 | :--- | :--- | :--- |
 | `--repo` | `-r` | Default target repository path. Omit for dynamic unbound mode. |
-| `--store-local` | `-l` | Store database in `<repo-path>/.agent-index/codegraph.db`. Requires `--repo`. |
 | `--db-dir` | — | Explicit directory override for SQLite database location. |
 
 ---

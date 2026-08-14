@@ -68,18 +68,17 @@ Parses, indexes, and builds symbol/reference graphs for a target repository.
 - **Incremental Logic**: Performs git commit inspection. If HEAD equals `last_indexed_commit` and no uncommitted files exist, execution terminates instantly (<20ms).
 - **Execution Options**:
   - `<repo-path>` *(Required)*: Target repository directory.
-  - `--store-local`, `-l`: Saves index in `<repo-path>/.agent-index/codegraph.db`.
-  - `--db-dir <path>`: Custom location for the SQLite database.
+  - `--db-dir <path>`: Custom location for the SQLite database (defaults to `<repo-path>/.codegraph/`).
   - `--force-full`: Forces full parse cycle, bypassing Git delta detection.
   - `--no-ignore`: Ignores `.gitignore` rules to index hidden or build-generated source files.
 
 #### Examples:
 ```powershell
 # Standard local repository index
-CodeGraphMcp index "D:\Projects\C#\CodeGraphMcp" --store-local
+CodeGraphMcp index "D:\Projects\C#\CodeGraphMcp"
 
 # Force complete re-index overriding git deltas and ignore rules
-CodeGraphMcp index "C:\Services\PaymentGateway" --store-local --force-full --no-ignore
+CodeGraphMcp index "C:\Services\PaymentGateway" --force-full --no-ignore
 
 # Store index in custom central path
 CodeGraphMcp index "C:\Repo" --db-dir "C:\SharedIndexes\RepoDb"
@@ -94,16 +93,15 @@ Searches for symbol definitions, signatures, line boundaries, and source code di
 - **Execution Options**:
   - `<symbol-name>` *(Required)*: Symbol or wildcard pattern.
   - `--repo`, `-r <path>`: Target repository context (defaults to CWD).
-  - `--store-local`, `-l`: Reads `<repo>/.agent-index/codegraph.db`.
   - `--db-dir <path>`: Custom path to SQLite index directory.
 
 #### Examples:
 ```powershell
 # Query symbol definition within the local directory
-CodeGraphMcp query "IndexOrchestrator" --store-local
+CodeGraphMcp query "IndexOrchestrator"
 
 # Query specific project repository from an external directory
-CodeGraphMcp query "PaymentProcessor" --repo "D:\Projects\Services\Billing" --store-local
+CodeGraphMcp query "PaymentProcessor" --repo "D:\Projects\Services\Billing"
 ```
 
 ---
@@ -114,12 +112,11 @@ Reports current repository health, branch info, committed vs. indexed state, and
 - **Developer Context**: Queries SQLite metadata alongside local Git HEAD. Flags whether re-indexing is required.
 - **Execution Options**:
   - `<repo-path>` *(Required)*: Target directory path.
-  - `--store-local`, `-l`: Targets `<repo-path>/.agent-index/codegraph.db`.
 
 #### Examples:
 ```powershell
 # Inspect repository index status
-CodeGraphMcp status "D:\Projects\C#\CodeGraphMcp" --store-local
+CodeGraphMcp status "D:\Projects\C#\CodeGraphMcp"
 ```
 
 ---
@@ -131,12 +128,11 @@ Runs a background daemon polling Git commit state and updating the index upon co
 - **Execution Options**:
   - `<repo-path>` *(Required)*: Repository path to monitor.
   - `--interval <seconds>`: Polling frequency (default: `30`).
-  - `--store-local`, `-l`: Operates on `.agent-index/codegraph.db`.
 
 #### Examples:
 ```powershell
 # Watch repository with 15-second polling loop
-CodeGraphMcp watch "D:\Projects\C#\CodeGraphMcp" --store-local --interval 15
+CodeGraphMcp watch "D:\Projects\C#\CodeGraphMcp" --interval 15
 ```
 
 ---
@@ -147,13 +143,12 @@ Purges SQLite databases and WAL journal files associated with the repository.
 - **Developer Context**: Frees storage or resets corrupt state before re-indexing.
 - **Execution Options**:
   - `<repo-path>` *(Required)*: Path to target repo.
-  - `--store-local`, `-l`: Deletes `.agent-index/codegraph.db`.
   - `--yes`, `-y` / `--force`, `-f`: Bypasses user confirmation prompt.
 
 #### Examples:
 ```powershell
 # Purge local repository index database silently
-CodeGraphMcp clean "D:\Projects\C#\CodeGraphMcp" --store-local --yes
+CodeGraphMcp clean "D:\Projects\C#\CodeGraphMcp" --yes
 ```
 
 ---
@@ -164,7 +159,6 @@ Launches the Model Context Protocol (MCP) server over `stdio` for AI tool integr
 - **Developer Context**: Establishes standard I/O JSON-RPC server listening for MCP requests. Integrates natively with Antigravity, Claude, Cursor, and Copilot.
 - **Execution Options**:
   - `--repo`, `-r <path>`: Binds server to a fixed target directory.
-  - `--store-local`, `-l`: Uses `.agent-index/codegraph.db` in bound target directory.
   - `--db-dir <path>`: Custom DB storage location.
 
 #### Examples:
@@ -173,7 +167,7 @@ Launches the Model Context Protocol (MCP) server over `stdio` for AI tool integr
 CodeGraphMcp serve
 
 # Launch repository-bound MCP server using local index
-CodeGraphMcp serve --repo "D:\Projects\C#\CodeGraphMcp" --store-local
+CodeGraphMcp serve --repo "D:\Projects\C#\CodeGraphMcp"
 ```
 
 ---
@@ -186,7 +180,7 @@ Before renaming or refactoring core methods, developers can use `get_diff_impact
 **Workflow Command Example:**
 ```powershell
 # Index project first
-CodeGraphMcp index "C:\Projects\CoreEngine" --store-local
+CodeGraphMcp index "C:\Projects\CoreEngine"
 
 # MCP Tool Request Payload (via JSON-RPC stdio)
 # Tool: get_diff_impact

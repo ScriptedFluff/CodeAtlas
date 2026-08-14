@@ -15,7 +15,7 @@ public sealed class AppConfig
     ];
 
     public List<string> IgnoreDirectories { get; set; } = [
-        ".git", ".agent-index", "bin", "obj",
+        ".git", ".codegraph", "bin", "obj",
         "node_modules", "dist", ".next", "coverage", ".vs",
         "packages", "TestResults", "publish", "out", "temp", "tmp", "vendor", ".idea"
     ];
@@ -33,14 +33,12 @@ public sealed class AppConfig
         var exeConfigPath = Path.Combine(exeDir, "appsettings.json");
         MergeConfigFile(config, exeConfigPath);
 
-        // 2. Try repository root codegraphmcp.json, .codegraphmcp.json, .codegraph.json or appsettings.json if present
+        // 2. Try repository settings at .codegraph/settings.json or appsettings.json if present
         if (!string.IsNullOrWhiteSpace(repoPath) && Directory.Exists(repoPath))
         {
             var configFiles = new[]
             {
-                Path.Combine(repoPath, "codegraphmcp.json"),
-                Path.Combine(repoPath, ".codegraphmcp.json"),
-                Path.Combine(repoPath, ".codegraph.json"),
+                Path.Combine(repoPath, ".codegraph", "settings.json"),
                 Path.Combine(repoPath, "appsettings.json")
             };
 

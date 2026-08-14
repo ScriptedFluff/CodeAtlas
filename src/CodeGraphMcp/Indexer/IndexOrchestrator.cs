@@ -11,7 +11,7 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
 {
     private static readonly HashSet<string> DefaultIgnoredDirs = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".git", ".agent-index", "bin", "obj",
+        ".git", ".codegraph", "bin", "obj",
         "node_modules", "dist", ".next", "coverage", ".vs",
         "packages", "TestResults", "publish", "out", "temp", "tmp", "vendor", ".idea"
     };

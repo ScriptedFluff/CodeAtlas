@@ -6,14 +6,12 @@ namespace CodeGraphMcp.Db;
 public sealed class WorkspaceDbManager : IWorkspaceDbManager
 {
     private readonly string? _dbDirOverride;
-    private readonly bool _storeLocal;
     private readonly ConcurrentDictionary<string, Lazy<CodeGraphDb>> _databases = new(StringComparer.OrdinalIgnoreCase);
     private bool _disposed;
 
-    public WorkspaceDbManager(string? dbDirOverride = null, bool storeLocal = true)
+    public WorkspaceDbManager(string? dbDirOverride = null)
     {
         _dbDirOverride = dbDirOverride;
-        _storeLocal = storeLocal;
     }
 
     public string ResolveWorkspaceRoot(string targetDirectory)
@@ -32,7 +30,7 @@ public sealed class WorkspaceDbManager : IWorkspaceDbManager
 
         var lazyDb = _databases.GetOrAdd(workspaceRoot, rootKey => new Lazy<CodeGraphDb>(() =>
         {
-            var dbPath = StorageConfig.ResolveDbPath(_dbDirOverride, _storeLocal, rootKey);
+            var dbPath = StorageConfig.ResolveDbPath(_dbDirOverride, rootKey);
             var db = new CodeGraphDb(dbPath);
             db.Migrate();
             return db;

@@ -12,8 +12,7 @@ public static class CommandFactory
     public static RootCommand CreateRootCommand()
     {
         var repoArgument     = new Argument<DirectoryInfo>("repo-path", "Path to the repository root to index");
-        var dbDirOption      = new Option<DirectoryInfo?>("--db-dir", "Override directory for the SQLite database");
-        var storeLocalOption = new Option<bool>(new[] { "--store-local", "-l" }, "Store the database inside the repo under .agent-index/");
+        var dbDirOption      = new Option<DirectoryInfo?>("--db-dir", "Override directory for the repository's SQLite database (defaults to <repo>/.codegraph/)");
         var forceFullOption  = new Option<bool>("--force-full", "Skip delta detection and re-index everything");
         var noIgnoreOption   = new Option<bool>("--no-ignore", "Disable .gitignore rule filtering during indexing");
         var verboseOption    = new Option<bool>(new[] { "--verbose", "-v" }, "Enable verbose progress and detailed console output");
@@ -22,14 +21,13 @@ public static class CommandFactory
         var indexCommand = new Command("index", "Parse and index a repository into the knowledge graph");
         indexCommand.AddArgument(repoArgument);
         indexCommand.AddOption(dbDirOption);
-        indexCommand.AddOption(storeLocalOption);
         indexCommand.AddOption(forceFullOption);
         indexCommand.AddOption(noIgnoreOption);
         indexCommand.AddOption(verboseOption);
-        indexCommand.SetHandler(async (repo, dbDir, storeLocal, force, noIgnore, verbose) =>
+        indexCommand.SetHandler(async (repo, dbDir, force, noIgnore, verbose) =>
         {
             var normRepo = WorkspacePathResolver.NormalizePath(repo.FullName);
-            var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, normRepo);
+            var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, normRepo);
             using var db = new CodeGraphDb(dbPath);
             db.Migrate();
 
@@ -61,7 +59,7 @@ public static class CommandFactory
                     _              => $"{seedInfo}Done ({result.ElapsedMs}ms)"
                 });
             }
-        }, repoArgument, dbDirOption, storeLocalOption, forceFullOption, noIgnoreOption, verboseOption);
+        }, repoArgument, dbDirOption, forceFullOption, noIgnoreOption, verboseOption);
 
 
         // ── query ──────────────────────────────────────────────────────────────────
@@ -80,7 +78,6 @@ public static class CommandFactory
         queryCommand.AddOption(limitOption);
         queryCommand.AddOption(skipOption);
         queryCommand.AddOption(dbDirOption);
-        queryCommand.AddOption(storeLocalOption);
         queryCommand.AddOption(referencedOption);
         queryCommand.SetHandler((context) =>
         {
@@ -91,12 +88,11 @@ public static class CommandFactory
             var limitVal       = context.ParseResult.GetValueForOption(limitOption);
             var skipVal        = context.ParseResult.GetValueForOption(skipOption);
             var dbDir          = context.ParseResult.GetValueForOption(dbDirOption);
-            var storeLocal     = context.ParseResult.GetValueForOption(storeLocalOption);
             var withReferences = context.ParseResult.GetValueForOption(referencedOption);
 
             var startDir = repoOpt?.FullName ?? Directory.GetCurrentDirectory();
             var repoRoot = repoOpt is not null ? startDir : (FindGitRoot(startDir) ?? startDir);
-            var dbPath   = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, repoRoot);
+            var dbPath   = StorageConfig.ResolveDbPath(dbDir?.FullName, repoRoot);
 
             if (!File.Exists(dbPath))
             {
@@ -158,31 +154,23 @@ public static class CommandFactory
         });
 
         // ── serve ──────────────────────────────────────────────────────────────────
-        var serveRepoArg          = new Argument<DirectoryInfo?>("repo-path", () => null, "Repository path to serve (optional)");
-        var serveRepoOption       = new Option<DirectoryInfo?>(new[] { "--repo", "-r" }, "Repository path to serve (optional, defaults to unbound/dynamic target directories)");
-        var serveDbDirOption      = new Option<DirectoryInfo?>("--db-dir", "Override SQLite database directory");
-        var serveStoreLocalOption = new Option<bool>(new[] { "--store-local", "-l" }, "Use .agent-index/ in repo");
+        var serveRepoArg     = new Argument<DirectoryInfo?>("repo-path", () => null, "Repository path to serve (optional)");
+        var serveRepoOption  = new Option<DirectoryInfo?>(new[] { "--repo", "-r" }, "Repository path to serve (optional, defaults to unbound/dynamic target directories)");
+        var serveDbDirOption = new Option<DirectoryInfo?>("--db-dir", "Override SQLite database directory");
 
         var serveCommand = new Command("serve", "Start the MCP stdio server");
         serveCommand.AddArgument(serveRepoArg);
         serveCommand.AddOption(serveRepoOption);
         serveCommand.AddOption(serveDbDirOption);
-        serveCommand.AddOption(serveStoreLocalOption);
 
         serveCommand.SetHandler(async (context) =>
         {
-            var repoArg    = context.ParseResult.GetValueForArgument(serveRepoArg);
-            var repoOpt    = context.ParseResult.GetValueForOption(serveRepoOption);
-            var dbDir      = context.ParseResult.GetValueForOption(serveDbDirOption);
-            var storeLocal = context.ParseResult.GetValueForOption(serveStoreLocalOption);
+            var repoArg = context.ParseResult.GetValueForArgument(serveRepoArg);
+            var repoOpt = context.ParseResult.GetValueForOption(serveRepoOption);
+            var dbDir   = context.ParseResult.GetValueForOption(serveDbDirOption);
 
             var repoPath = repoArg?.FullName ?? repoOpt?.FullName;
-            if (storeLocal && repoPath is null)
-            {
-                Console.Error.WriteLine("Warning: --store-local (-l) requires repo-path to locate repository root. Ignoring --store-local for unbound mode.");
-            }
-
-            var dbPath = repoPath is not null ? StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, repoPath) : dbDir?.FullName;
+            var dbPath = repoPath is not null ? StorageConfig.ResolveDbPath(dbDir?.FullName, repoPath) : dbDir?.FullName;
             await CodeGraphMcp.Mcp.McpServer.RunAsync(repoPath, dbPath, context.GetCancellationToken());
         });
 
@@ -190,10 +178,9 @@ public static class CommandFactory
         var statusCommand = new Command("status", "Show the current index state for a repository");
         statusCommand.AddArgument(repoArgument);
         statusCommand.AddOption(dbDirOption);
-        statusCommand.AddOption(storeLocalOption);
-        statusCommand.SetHandler((repo, dbDir, storeLocal) =>
+        statusCommand.SetHandler((repo, dbDir) =>
         {
-            var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, repo.FullName);
+            var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, repo.FullName);
             if (!File.Exists(dbPath))
             {
                 Console.WriteLine($"No database found at '{dbPath}'.");
@@ -221,7 +208,7 @@ public static class CommandFactory
             Console.WriteLine($"Files Indexed:    {fileCount}");
             Console.WriteLine($"Symbols Indexed:  {symbolCount}");
             Console.WriteLine($"References:       {refCount}");
-        }, repoArgument, dbDirOption, storeLocalOption);
+        }, repoArgument, dbDirOption);
 
         // ── clean ──────────────────────────────────────────────────────────────────
         var forceOption = new Option<bool>(new[] { "--force", "-f" }, "Skip confirmation prompt");
@@ -230,12 +217,11 @@ public static class CommandFactory
         var cleanCommand = new Command("clean", "Delete the index database for a repository");
         cleanCommand.AddArgument(repoArgument);
         cleanCommand.AddOption(dbDirOption);
-        cleanCommand.AddOption(storeLocalOption);
         cleanCommand.AddOption(forceOption);
         cleanCommand.AddOption(yesOption);
-        cleanCommand.SetHandler((repo, dbDir, storeLocal, force, yes) =>
+        cleanCommand.SetHandler((repo, dbDir, force, yes) =>
         {
-            var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, repo.FullName);
+            var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, repo.FullName);
             if (!File.Exists(dbPath))
             {
                 Console.WriteLine($"No database found at '{dbPath}'.");
@@ -261,7 +247,7 @@ public static class CommandFactory
             if (File.Exists(shmPath)) File.Delete(shmPath);
 
             Console.WriteLine($"Deleted '{dbPath}'.");
-        }, repoArgument, dbDirOption, storeLocalOption, forceOption, yesOption);
+        }, repoArgument, dbDirOption, forceOption, yesOption);
 
         // ── watch ──────────────────────────────────────────────────────────────────
         var intervalOption = new Option<int>("--interval", () => 30, "Seconds between index checks");
@@ -269,11 +255,10 @@ public static class CommandFactory
         var watchCommand = new Command("watch", "Continuously re-index on git changes");
         watchCommand.AddArgument(repoArgument);
         watchCommand.AddOption(dbDirOption);
-        watchCommand.AddOption(storeLocalOption);
         watchCommand.AddOption(intervalOption);
-        watchCommand.SetHandler(async (repo, dbDir, storeLocal, interval) =>
+        watchCommand.SetHandler(async (repo, dbDir, interval) =>
         {
-            var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, repo.FullName);
+            var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, repo.FullName);
             using var db = new CodeGraphDb(dbPath);
             db.Migrate();
 
@@ -307,7 +292,7 @@ public static class CommandFactory
                 }
             }
             Console.WriteLine("Stopped.");
-        }, repoArgument, dbDirOption, storeLocalOption, intervalOption);
+        }, repoArgument, dbDirOption, intervalOption);
 
         // ── prune ──────────────────────────────────────────────────────────────────
         var pruneCommand = new Command("prune", "Remove stale index databases for non-existent repositories or worktrees");

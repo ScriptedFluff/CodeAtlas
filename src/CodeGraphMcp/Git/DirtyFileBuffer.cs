@@ -12,7 +12,7 @@ public sealed class DirtyFileBuffer(string repoPath, IReadOnlyList<ILanguagePars
 {
     private static readonly HashSet<string> IgnoredDirs = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".git", ".agent-index", "bin", "obj", "publish",
+        ".git", ".codegraph", "bin", "obj", "publish",
         "node_modules", "dist", ".next", "coverage", ".vs"
     };
 
