@@ -9,11 +9,11 @@ public sealed partial class PowerShellParser : ILanguageParser
     public string Language => "powershell";
 
     // Matches: function [scope:]Name or filter [scope:]Name or workflow [scope:]Name
-    [GeneratedRegex(@"^\s*(?:function|filter|workflow)\s+(?:[a-zA-Z0-9_-]+:)?(?<name>[a-zA-Z0-9_\-\.]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(@"\b(?:function|filter|workflow)\s+(?:[a-zA-Z0-9_-]+:)?(?<name>[a-zA-Z0-9_\-\.]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex FunctionRegex();
 
-    // Matches param variables $ParamName
-    [GeneratedRegex(@"\$([a-zA-Z0-9_]+)", RegexOptions.Compiled)]
+    // Matches param variables $ParamName or $Param-Name
+    [GeneratedRegex(@"\$([a-zA-Z0-9_\-]+)", RegexOptions.Compiled)]
     private static partial Regex ParamVarRegex();
 
     // Matches Cmdlet / Function invocations: Verb-Noun
@@ -56,6 +56,28 @@ public sealed partial class PowerShellParser : ILanguageParser
         var lines = source.Split('\n');
         int currentByteOffset = 0;
 
+        var scriptName = Path.GetFileNameWithoutExtension(filePath);
+        if (!string.IsNullOrWhiteSpace(scriptName))
+        {
+            var topDoc = ExtractDocComment(lines, 0);
+            symbols.Add(new Symbol
+            {
+                SymbolName = scriptName,
+                SymbolType = SymbolType.Function,
+                Language = "powershell",
+                FilePath = filePath,
+                StartLine = 1,
+                EndLine = Math.Max(1, lines.Length),
+                StartByte = 0,
+                EndByte = source.Length,
+                Signature = $"script {Path.GetFileName(filePath)}",
+                DocComment = topDoc,
+                IsPartial = false
+            });
+        }
+
+        bool inTopLevelParamBlock = false;
+
         for (int i = 0; i < lines.Length; i++)
         {
             var line = lines[i];
@@ -76,13 +98,8 @@ public sealed partial class PowerShellParser : ILanguageParser
                 var startByte = currentByteOffset + nameGroup.Index;
                 var endByte = startByte + nameGroup.Length;
 
-                // Find block end (brace matching)
                 int endLine = FindMatchingEndLine(lines, i);
-
-                // Collect signature
                 string? signature = ExtractSignature(lines, i, funcName);
-
-                // Collect doc comment above function
                 string? docComment = ExtractDocComment(lines, i);
 
                 symbols.Add(new Symbol
@@ -100,9 +117,47 @@ public sealed partial class PowerShellParser : ILanguageParser
                     IsPartial = false
                 });
 
-                // Extract params within function scope
                 var funcParams = ExtractParameters(lines, i, endLine, filePath, funcName, currentByteOffset);
                 symbols.AddRange(funcParams);
+            }
+            else
+            {
+                if (trimmed.StartsWith("param", StringComparison.OrdinalIgnoreCase))
+                {
+                    inTopLevelParamBlock = true;
+                }
+
+                if (inTopLevelParamBlock)
+                {
+                    var matches = ParamVarRegex().Matches(line);
+                    foreach (Match match in matches)
+                    {
+                        var paramName = "$" + match.Groups[1].Value;
+                        if (!symbols.Any(s => s.SymbolName == paramName && s.StartLine == i + 1))
+                        {
+                            symbols.Add(new Symbol
+                            {
+                                SymbolName = paramName,
+                                SymbolType = SymbolType.Variable,
+                                ClassName = scriptName,
+                                Language = "powershell",
+                                FilePath = filePath,
+                                StartLine = i + 1,
+                                EndLine = i + 1,
+                                StartByte = currentByteOffset + match.Index,
+                                EndByte = currentByteOffset + match.Index + match.Length,
+                                Signature = $"Param: {paramName}",
+                                DocComment = null,
+                                IsPartial = false
+                            });
+                        }
+                    }
+
+                    if (line.Contains(')'))
+                    {
+                        inTopLevelParamBlock = false;
+                    }
+                }
             }
 
             currentByteOffset += line.Length + 1;
@@ -170,7 +225,6 @@ public sealed partial class PowerShellParser : ILanguageParser
             }
             else if (line.EndsWith("#>"))
             {
-                // Multi-line comment block
                 for (int k = j; k >= 0; k--)
                 {
                     var commentLine = lines[k].Trim();

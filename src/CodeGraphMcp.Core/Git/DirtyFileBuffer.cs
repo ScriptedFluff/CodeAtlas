@@ -139,10 +139,11 @@ public sealed class DirtyFileBuffer(string repoPath, IReadOnlyList<ILanguagePars
     /// </summary>
     public IReadOnlyList<Symbol>? FindByName(string symbolName, string? language = null)
     {
+        var normLang = Config.LanguageNormalizer.Normalize(language);
         var allDirty = _cache.Values
             .SelectMany(s => s)
             .Where(s => s.SymbolName.Contains(symbolName, StringComparison.OrdinalIgnoreCase))
-            .Where(s => language is null || string.Equals(s.Language, language, StringComparison.OrdinalIgnoreCase))
+            .Where(s => normLang is null || string.Equals(s.Language, normLang, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(s => string.Equals(s.SymbolName, symbolName, StringComparison.OrdinalIgnoreCase))
             .ToList();
 

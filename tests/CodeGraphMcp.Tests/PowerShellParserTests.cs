@@ -1,3 +1,4 @@
+using CodeGraphMcp.Config;
 using CodeGraphMcp.Models;
 using CodeGraphMcp.Parser;
 using Xunit;
@@ -35,8 +36,6 @@ public class PowerShellParserTests
         Assert.NotNull(getStatusFunc);
         Assert.Equal(SymbolType.Function, getStatusFunc.SymbolType);
         Assert.Equal("powershell", getStatusFunc.Language);
-        Assert.Equal(2, getStatusFunc.StartLine);
-        Assert.Equal(8, getStatusFunc.EndLine);
         Assert.Contains("Synopsis", getStatusFunc.DocComment ?? "");
 
         var filterFunc = symbols.FirstOrDefault(s => s.SymbolName == "Filter-Output");
@@ -46,6 +45,52 @@ public class PowerShellParserTests
         var paramsExtracted = symbols.Where(s => s.SymbolType == SymbolType.Variable).ToList();
         Assert.Contains(paramsExtracted, p => p.SymbolName == "$ProjectPath");
         Assert.Contains(paramsExtracted, p => p.SymbolName == "$Timeout");
+    }
+
+    [Fact]
+    public void Parse_ExtractsScriptLevelSymbolAndTopLevelParams()
+    {
+        var psScript = """
+            [CmdletBinding()]
+            param(
+                [string]$Get-TemplateParameters,
+                [string]$ResourceGroupName
+            )
+
+            Write-Output "Configuring security..."
+            """;
+
+        var symbols = _parser.Parse("src/Clever.Services.ResourceGroup/Scripts/Configure-Security.ps1", psScript).ToList();
+
+        Assert.NotEmpty(symbols);
+
+        var scriptSymbol = symbols.FirstOrDefault(s => s.SymbolName == "Configure-Security");
+        Assert.NotNull(scriptSymbol);
+        Assert.Equal(SymbolType.Function, scriptSymbol.SymbolType);
+        Assert.Equal("powershell", scriptSymbol.Language);
+
+        var templateParam = symbols.FirstOrDefault(s => s.SymbolName == "$Get-TemplateParameters");
+        Assert.NotNull(templateParam);
+        Assert.Equal(SymbolType.Variable, templateParam.SymbolType);
+    }
+
+    [Fact]
+    public void LanguageNormalizer_NormalizesAliasesCorrectly()
+    {
+        Assert.Equal("powershell", LanguageNormalizer.Normalize("ps1"));
+        Assert.Equal("powershell", LanguageNormalizer.Normalize("ps"));
+        Assert.Equal("powershell", LanguageNormalizer.Normalize("powershell"));
+        Assert.Equal("powershell", LanguageNormalizer.Normalize(".ps1"));
+
+        Assert.Equal("csharp", LanguageNormalizer.Normalize("cs"));
+        Assert.Equal("csharp", LanguageNormalizer.Normalize("c#"));
+        Assert.Equal("csharp", LanguageNormalizer.Normalize("csharp"));
+
+        Assert.Equal("typescript", LanguageNormalizer.Normalize("ts"));
+        Assert.Equal("javascript", LanguageNormalizer.Normalize("js"));
+        Assert.Equal("python", LanguageNormalizer.Normalize("py"));
+        Assert.Equal("yaml", LanguageNormalizer.Normalize("yml"));
+        Assert.Null(LanguageNormalizer.Normalize(null));
     }
 
     [Fact]

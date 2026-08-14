@@ -108,12 +108,13 @@ public static class CommandFactory
             var buffer  = new DirtyFileBuffer(repoRoot, parsers);
             buffer.Refresh();
 
-            var dirtyResults = buffer.FindByName(symbol, langOpt);
+            var normLang     = LanguageNormalizer.Normalize(langOpt);
+            var dirtyResults = buffer.FindByName(symbol, normLang);
             if (dirtyResults is not null && dirtyResults.Count > 0)
             {
                 var filteredDirty = dirtyResults
                     .Where(s => typeOpt is null || s.SymbolType.ToString().Equals(typeOpt, StringComparison.OrdinalIgnoreCase))
-                    .Where(s => langOpt is null || (s.Language ?? "").Equals(langOpt, StringComparison.OrdinalIgnoreCase))
+                    .Where(s => normLang is null || (s.Language ?? "").Equals(normLang, StringComparison.OrdinalIgnoreCase))
                     .Skip(Math.Max(0, skipVal))
                     .Take(limitVal <= 0 ? 500 : limitVal)
                     .ToList();
@@ -136,7 +137,7 @@ public static class CommandFactory
             var fetchMax = Math.Max(skipVal + limitVal, 500);
             var results = db.Symbols.FindByName(symbol, fetchMax, Math.Max(0, skipVal))
                 .Where(s => typeOpt is null || s.SymbolType.ToString().Equals(typeOpt, StringComparison.OrdinalIgnoreCase))
-                .Where(s => langOpt is null || (s.Language ?? "").Equals(langOpt, StringComparison.OrdinalIgnoreCase))
+                .Where(s => normLang is null || (s.Language ?? "").Equals(normLang, StringComparison.OrdinalIgnoreCase))
                 .Take(limitVal <= 0 ? 500 : limitVal)
                 .ToList();
 

@@ -69,6 +69,8 @@ public sealed class SearchCodebaseGraphTool(
         var db = context.Db;
         var buffer = bufferManager.GetOrCreateBuffer(context.WorkspaceRoot);
 
+        var normLang = CodeGraphMcp.Config.LanguageNormalizer.Normalize(language);
+
         var effectiveLimit = limit <= 0 ? 500 : Math.Min(limit, 500);
         var effectiveOffset = Math.Max(0, offset);
         var dbFetchLimit = Math.Max(effectiveOffset + effectiveLimit, 500);
@@ -78,8 +80,8 @@ public sealed class SearchCodebaseGraphTool(
             .Where(s => !exactMatch || s.SymbolName.Equals(pattern, StringComparison.OrdinalIgnoreCase))
             .Where(s => symbolType is null
                 || s.SymbolType.ToString().Equals(symbolType, StringComparison.OrdinalIgnoreCase))
-            .Where(s => language is null
-                || (s.Language ?? "").Equals(language, StringComparison.OrdinalIgnoreCase))
+            .Where(s => normLang is null
+                || (s.Language ?? "").Equals(normLang, StringComparison.OrdinalIgnoreCase))
             .Where(s => compiledRegex is null || compiledRegex.IsMatch(s.SymbolName))
             .Select(s => new SearchMatch(
                 s.SymbolName, s.SymbolType.ToString(), s.Language,
@@ -90,7 +92,7 @@ public sealed class SearchCodebaseGraphTool(
         List<SearchMatch> dirtyMatches;
         if (exactMatch)
         {
-            var hits = buffer.FindByName(pattern, language) ?? [];
+            var hits = buffer.FindByName(pattern, normLang) ?? [];
             dirtyMatches = hits
                 .Where(s => s.SymbolName.Equals(pattern, StringComparison.OrdinalIgnoreCase))
                 .Where(s => symbolType is null
@@ -103,7 +105,7 @@ public sealed class SearchCodebaseGraphTool(
         }
         else if (!pattern.Contains('%'))
         {
-            var hits = buffer.FindByName(pattern, language) ?? [];
+            var hits = buffer.FindByName(pattern, normLang) ?? [];
             dirtyMatches = hits
                 .Where(s => symbolType is null
                     || s.SymbolType.ToString().Equals(symbolType, StringComparison.OrdinalIgnoreCase))
@@ -123,8 +125,8 @@ public sealed class SearchCodebaseGraphTool(
                 .Where(s => wildcardRegex.IsMatch(s.SymbolName)
                     && (symbolType is null
                         || s.SymbolType.ToString().Equals(symbolType, StringComparison.OrdinalIgnoreCase))
-                    && (language is null
-                        || (s.Language ?? "").Equals(language, StringComparison.OrdinalIgnoreCase))
+                    && (normLang is null
+                        || (s.Language ?? "").Equals(normLang, StringComparison.OrdinalIgnoreCase))
                     && (compiledRegex is null || compiledRegex.IsMatch(s.SymbolName)))
                 .Select(s => new SearchMatch(
                     s.SymbolName, s.SymbolType.ToString(), s.Language,
