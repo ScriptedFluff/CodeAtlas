@@ -44,3 +44,6 @@ Desktop.ini
 *.tmp
 *.log
 
+
+# CodeGraphMcp local index & settings
+.codegraph/

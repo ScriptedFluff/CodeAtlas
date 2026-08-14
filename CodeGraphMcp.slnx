@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/CodeGraphMcp/CodeGraphMcp.csproj" />
+    <Project Path="src/CodeGraphMcp.Core/CodeGraphMcp.Core.csproj" />
+    <Project Path="src/CodeGraphMcp.Server/CodeGraphMcp.Server.csproj" />
+    <Project Path="src/CodeGraphMcp.Cli/CodeGraphMcp.Cli.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/CodeGraphMcp.Tests/CodeGraphMcp.Tests.csproj" />

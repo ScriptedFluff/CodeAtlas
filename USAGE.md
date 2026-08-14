@@ -12,8 +12,11 @@
 # Build debug version
 dotnet build
 
-# Or publish a self-contained release folder
-dotnet publish src/CodeGraphMcp/CodeGraphMcp.csproj -c Release -o ./publish
+# Publish MCP Server daemon binary to ./publish/server
+dotnet publish src/CodeGraphMcp.Server/CodeGraphMcp.Server.csproj -c Release -o ./publish/server
+
+# Publish CLI binary to ./publish/cli
+dotnet publish src/CodeGraphMcp.Cli/CodeGraphMcp.Cli.csproj -c Release -o ./publish/cli
 ```
 
 ---
@@ -49,7 +52,7 @@ The `index` command scans source files, extracts symbols (classes, interfaces, m
 dotnet run --project src/CodeGraphMcp -- index "C:\path\to\your\repository"
 
 # Using published binary
-.\publish\CodeGraphMcp.exe index "C:\path\to\your\repository"
+.\publish\cli\CodeGraphMcp.Cli.exe index "C:\path\to\your\repository"
 ```
 
 ### Command Options
@@ -81,7 +84,7 @@ dotnet run --project src/CodeGraphMcp -- query "IndexOrchestrator"
 dotnet run --project src/CodeGraphMcp -- query "Individual" --repo "D:\Work\Clever Services\21959" --referenced
 
 # Or using the published binary with --with-references alias
-.\publish\CodeGraphMcp.exe query "MyClass" -r "C:\Projects\MyOtherApp" --with-references
+.\publish\cli\CodeGraphMcp.Cli.exe query "MyClass" -r "C:\Projects\MyOtherApp" --with-references
 ```
 
 ### Command Options
@@ -193,7 +196,7 @@ dotnet run --project src/CodeGraphMcp -- serve
 dotnet run --project src/CodeGraphMcp -- serve -r "C:\path\to\your\repository"
 
 # Using published binary
-.\publish\CodeGraphMcp.exe serve -r "C:\path\to\your\repository"
+.\publish\cli\CodeGraphMcp.Cli.exe serve -r "C:\path\to\your\repository"
 ```
 
 ### Command Options
@@ -262,10 +265,8 @@ Scans the global index storage cache for database files whose repository roots o
 {
   "mcpServers": {
     "codegraph": {
-      "command": "C:\\path\\to\\CodeGraphMcp\\publish\\CodeGraphMcp.exe",
-      "args": [
-        "serve"
-      ]
+      "command": "C:\\path\\to\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+      "args": []
     }
   }
 }

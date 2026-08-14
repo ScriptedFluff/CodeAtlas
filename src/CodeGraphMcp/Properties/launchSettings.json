@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "CodeGraphMcp": {
-      "commandName": "Project",
-      "commandLineArgs": "index \"D:\\Work\\Clever Services\\master\\\" --force-full"
-    }
-  }
-}

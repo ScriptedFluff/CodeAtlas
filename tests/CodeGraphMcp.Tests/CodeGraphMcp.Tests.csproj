@@ -24,7 +24,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\CodeGraphMcp\CodeGraphMcp.csproj" />
+    <ProjectReference Include="..\..\src\CodeGraphMcp.Core\CodeGraphMcp.Core.csproj" />
+    <ProjectReference Include="..\..\src\CodeGraphMcp.Server\CodeGraphMcp.Server.csproj" />
+    <ProjectReference Include="..\..\src\CodeGraphMcp.Cli\CodeGraphMcp.Cli.csproj" />
   </ItemGroup>
 
 </Project>

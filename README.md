@@ -42,44 +42,49 @@ Instead of forcing AI agents to repeatedly scan file trees or spend context wind
 ### 1. Prerequisites
 - [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 
-### 2. Build & Publish Release Executable
+### 2. Build & Publish Release Executables
 ```powershell
 # Clone the repository
 git clone https://github.com/ScriptedFluff/CodeGraphMcp.git
 cd CodeGraphMcp
 
-# Publish self-contained Native AOT release binary
-dotnet publish src/CodeGraphMcp/CodeGraphMcp.csproj -c Release -o ./publish
+# Publish MCP Server daemon binary to ./publish/server
+dotnet publish src/CodeGraphMcp.Server/CodeGraphMcp.Server.csproj -c Release -o ./publish/server
+
+# Publish CLI binary to ./publish/cli
+dotnet publish src/CodeGraphMcp.Cli/CodeGraphMcp.Cli.csproj -c Release -o ./publish/cli
 ```
-The compiled executable will be located at `.\publish\CodeGraphMcp.exe`.
+The compiled executables will be located at:
+- MCP Daemon Server: `.\publish\server\CodeGraphMcp.Server.exe`
+- CLI Utility: `.\publish\cli\CodeGraphMcp.Cli.exe`
 
 ---
 
 ## 📖 CLI How-to-Use Tutorial
 
-`CodeGraphMcp` operates both as a standalone command-line utility and as an MCP Server (`serve`).
+`CodeGraphMcp.Cli` (`cg`) operates as a standalone command-line utility.
 
 ```powershell
 # 1. Index a repository (stores SQLite database inside <repo>/.codegraph/code_graph.db)
-.\publish\CodeGraphMcp.exe index "C:\Projects\MyRepo"
+.\publish\cli\CodeGraphMcp.Cli.exe index "C:\Projects\MyRepo"
 
 # 2. Query a symbol definition
-.\publish\CodeGraphMcp.exe query "IndexOrchestrator" -r "C:\Projects\MyRepo"
+.\publish\cli\CodeGraphMcp.Cli.exe query "IndexOrchestrator" -r "C:\Projects\MyRepo"
 
 # 3. Query with type, language, and pagination filters
-.\publish\CodeGraphMcp.exe query "Morningstar" -r "C:\Projects\MyRepo" --lang json --type Property --limit 20 --skip 0
+.\publish\cli\CodeGraphMcp.Cli.exe query "Morningstar" -r "C:\Projects\MyRepo" --lang json --type Property --limit 20 --skip 0
 
 # 4. Check index database status & commit state
-.\publish\CodeGraphMcp.exe status "C:\Projects\MyRepo"
+.\publish\cli\CodeGraphMcp.Cli.exe status "C:\Projects\MyRepo"
 
 # 5. Prune stale worktrees & obsolete index caches to reclaim disk space
-.\publish\CodeGraphMcp.exe prune
+.\publish\cli\CodeGraphMcp.Cli.exe prune
 
 # 6. Continuous watcher for auto-reindexing on git commits
-.\publish\CodeGraphMcp.exe watch "C:\Projects\MyRepo" --interval 30
+.\publish\cli\CodeGraphMcp.Cli.exe watch "C:\Projects\MyRepo" --interval 30
 
 # 7. Start the MCP stdio server for AI assistants
-.\publish\CodeGraphMcp.exe serve
+.\publish\cli\CodeGraphMcp.Cli.exe serve
 ```
 
 ---

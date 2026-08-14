@@ -6,34 +6,38 @@ This guide details how to configure and integrate `CodeGraphMcp` as a Model Cont
 
 ## 1. Prerequisites & Setup
 
-Before configuring your AI client, publish a release binary of `CodeGraphMcp` for fast startup times:
+Before configuring your AI client, publish the release binaries for `CodeGraphMcp`:
 
 ```powershell
-# Publish self-contained executable to ./publish
-dotnet publish src/CodeGraphMcp/CodeGraphMcp.csproj -c Release -o ./publish
+# Publish MCP Server daemon binary to ./publish/server
+dotnet publish src/CodeGraphMcp.Server/CodeGraphMcp.Server.csproj -c Release -o ./publish/server
+
+# Publish CLI binary to ./publish/cli
+dotnet publish src/CodeGraphMcp.Cli/CodeGraphMcp.Cli.csproj -c Release -o ./publish/cli
 ```
 
-The compiled executable will be located at:
-`D:\Projects\C#\CodeGraphMcp\publish\CodeGraphMcp.exe` (or `dotnet run --project ...` during development).
+The compiled executables will be located at:
+- Server: `D:\Projects\C#\CodeGraphMcp\publish\server\CodeGraphMcp.Server.exe`
+- CLI: `D:\Projects\C#\CodeGraphMcp\publish\cli\CodeGraphMcp.Cli.exe`
 
 ---
 
 ## 2. Server Execution Modes
 
-`CodeGraphMcp` supports two primary execution modes in MCP server mode (`serve`):
+`CodeGraphMcp.Server` runs as a high-performance MCP stdio server:
 
 ### Mode A: Dynamic / Unbound Mode (Recommended)
 In this mode, no target repository is hardcoded at server launch. The server will resolve repository paths dynamically when tools are invoked, using either an explicit `targetDirectory` argument or defaulting to the client's current active workspace directory.
 
 ```powershell
-CodeGraphMcp.exe serve
+CodeGraphMcp.Server.exe
 ```
 
 ### Mode B: Bound Repository Mode
 In this mode, the server is locked to a specific repository path. Every tool query automatically targets this index unless explicitly overridden.
 
 ```powershell
-CodeGraphMcp.exe serve -r "C:\Projects\MyRepo"
+CodeGraphMcp.Server.exe -r "C:\Projects\MyRepo"
 ```
 
 ---
@@ -48,10 +52,8 @@ Add the following entry to your `mcp_config.json`:
 {
   "mcpServers": {
     "codegraph": {
-      "command": "C:\\Projects\\CodeGraphMcp\\publish\\CodeGraphMcp.exe",
-      "args": [
-        "serve"
-      ]
+      "command": "C:\\Projects\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+      "args": []
     }
   }
 }

@@ -1,8 +1,7 @@
 using System.ComponentModel;
 using Microsoft.Data.Sqlite;
-using ModelContextProtocol.Server;
 
-namespace CodeGraphMcp.Mcp.Tools;
+namespace CodeGraphMcp.Db;
 
 public sealed record PrunedWorktreeEntry(
     string DatabasePath,
@@ -14,18 +13,11 @@ public sealed record PruneWorktreesResult(
     long TotalBytesFreed,
     IReadOnlyList<PrunedWorktreeEntry> PrunedEntries);
 
-[McpServerToolType]
-public sealed class PruneIndexedWorktreesTool
+public static class WorktreePruner
 {
-    [McpServerTool]
-    [Description("""
-        Scans the index storage registry for database caches whose underlying repository folders or git worktrees no longer exist on disk.
-        Purges obsolete .db cache files, freeing disk space and removing stale workspace indexes.
-        Returns a summary of pruned databases and total bytes freed.
-        """)]
-    public Task<PruneWorktreesResult> PruneIndexedWorktreesAsync(
-        [Description("Optional: override index database directory to prune (defaults to global appdata store %LOCALAPPDATA%/CodeGraph/dbs)")] string? dbDir = null,
-        [Description("Optional: if true, preview candidate databases to prune without performing actual file deletion")] bool dryRun = false,
+    public static Task<PruneWorktreesResult> PruneIndexedWorktreesAsync(
+        string? dbDir = null,
+        bool dryRun = false,
         CancellationToken ct = default)
     {
         var targetDir = dbDir;

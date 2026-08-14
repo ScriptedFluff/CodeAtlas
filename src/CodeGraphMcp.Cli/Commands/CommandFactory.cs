@@ -172,8 +172,42 @@ public static class CommandFactory
             var dbDir   = context.ParseResult.GetValueForOption(serveDbDirOption);
 
             var repoPath = repoArg?.FullName ?? repoOpt?.FullName;
-            var dbPath = repoPath is not null ? StorageConfig.ResolveDbPath(dbDir?.FullName, repoPath) : dbDir?.FullName;
-            await CodeGraphMcp.Mcp.McpServer.RunAsync(repoPath, dbPath, context.GetCancellationToken());
+
+            var baseDir = AppContext.BaseDirectory;
+            var serverExeName = OperatingSystem.IsWindows() ? "CodeGraphMcp.Server.exe" : "CodeGraphMcp.Server";
+            var serverPath = Path.Combine(baseDir, serverExeName);
+
+            var argsList = new List<string>();
+            if (!string.IsNullOrWhiteSpace(repoPath))
+            {
+                argsList.Add("--repo");
+                argsList.Add($"\"{repoPath}\"");
+            }
+            if (dbDir != null)
+            {
+                argsList.Add("--db-dir");
+                argsList.Add($"\"{dbDir.FullName}\"");
+            }
+
+            if (File.Exists(serverPath))
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo(serverPath, string.Join(" ", argsList))
+                {
+                    UseShellExecute = false,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                using var proc = System.Diagnostics.Process.Start(psi);
+                if (proc != null)
+                {
+                    await proc.WaitForExitAsync(context.GetCancellationToken());
+                }
+            }
+            else
+            {
+                Console.Error.WriteLine($"CodeGraphMcp.Server binary not found at '{serverPath}'. Launch 'CodeGraphMcp.Server' executable directly for MCP stdio server mode.");
+            }
         });
 
         // ── status ─────────────────────────────────────────────────────────────────
@@ -301,8 +335,7 @@ public static class CommandFactory
         pruneCommand.AddOption(dbDirOption);
         pruneCommand.SetHandler(async (dbDir) =>
         {
-            var tool = new Mcp.Tools.PruneIndexedWorktreesTool();
-            var res = await tool.PruneIndexedWorktreesAsync(dbDir?.FullName);
+            var res = await CodeGraphMcp.Db.WorktreePruner.PruneIndexedWorktreesAsync(dbDir?.FullName);
             Console.WriteLine($"Pruned {res.PrunedDatabaseCount} stale database(s), freed {res.TotalBytesFreed:N0} bytes.");
         }, dbDirOption);
 
