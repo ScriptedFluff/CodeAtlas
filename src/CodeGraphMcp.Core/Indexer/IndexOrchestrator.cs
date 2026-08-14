@@ -126,10 +126,25 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
             var symbolsList = chunkSymbols.ToList();
             var refsList = chunkRefs.ToList();
 
+            var batchSymbolCount = symbolsList.Sum(s => s.Symbols.Count);
+            var batchRefCount = refsList.Sum(r => r.Refs.Count);
+
+            if (verbose && (batchSymbolCount > 0 || batchRefCount > 0))
+            {
+                Console.WriteLine($"[Database] Writing {batchSymbolCount} symbols and {batchRefCount} references to database index...");
+            }
+
+            var dbSw = Stopwatch.StartNew();
             lock (db)
             {
                 var cache = db.Symbols.UpsertSymbolsBatch(symbolsList);
                 db.References.UpsertReferencesBatch(refsList, cache);
+            }
+            dbSw.Stop();
+
+            if (verbose && (batchSymbolCount > 0 || batchRefCount > 0))
+            {
+                Console.WriteLine($"[Database] Completed writing {batchSymbolCount} symbols and {batchRefCount} references in {dbSw.ElapsedMilliseconds}ms.");
             }
         }
 
