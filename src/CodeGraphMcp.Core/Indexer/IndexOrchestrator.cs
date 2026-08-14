@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Threading.Channels;
 using CodeGraphMcp.Db;
 using CodeGraphMcp.Git;
 using CodeGraphMcp.Models;
@@ -71,97 +72,105 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
 
         logger?.LogInformation("Found {FileCount} files to process in {RepoPath} (noIgnore: {NoIgnore})", files.Count, repoPath, noIgnore);
 
+        if (files.Count == 0)
+        {
+            return new IndexResult(0, 0, 0);
+        }
 
-        const int BatchSize = 250;
         int symbolsWritten = 0;
         int parsedFileCount = 0;
         int totalFiles = files.Count;
 
         var masterCache = new SymbolLookupCache();
-        var allRefsList = new List<(string RelPath, IReadOnlyList<SymbolReference> Refs)>();
+        var allRefsList = new System.Collections.Concurrent.ConcurrentBag<(string RelPath, IReadOnlyList<SymbolReference> Refs)>();
 
-        var chunks = files.Chunk(BatchSize).ToList();
-        int batchNumber = 0;
-
-        foreach (var chunk in chunks)
+        var channel = Channel.CreateUnbounded<(string RelPath, FileParseResult Result)>(new UnboundedChannelOptions
         {
-            batchNumber++;
-            var chunkSymbols = new System.Collections.Concurrent.ConcurrentBag<(string RelPath, IReadOnlyList<Symbol> Symbols)>();
-            var chunkRefs = new System.Collections.Concurrent.ConcurrentBag<(string RelPath, IReadOnlyList<SymbolReference> Refs)>();
+            SingleWriter = false,
+            SingleReader = true
+        });
 
-            await Parallel.ForEachAsync(chunk, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = ct }, async (filePath, token) =>
-            {
-                var ext = Path.GetExtension(filePath);
-                if (!_extensionMap.TryGetValue(ext, out var parser)) return;
-
-                try
-                {
-                    var relPath = WorkspacePathNormalizer.NormalizeRelativePath(repoPath, filePath);
-                    var currentIdx = Interlocked.Increment(ref parsedFileCount);
-                    if (verbose)
-                    {
-                        Console.WriteLine($"[{currentIdx} of {totalFiles}] Starting [{parser.Language}] {relPath}...");
-                    }
-
-                    var fileSw = Stopwatch.StartNew();
-                    var source = await File.ReadAllTextAsync(filePath, token);
-                    var parseResult = parser.ParseFile(relPath, source);
-                    fileSw.Stop();
-
-                    if (verbose)
-                    {
-                        Console.WriteLine($"[{currentIdx} of {totalFiles}] Finished [{parser.Language}] {relPath} in {fileSw.ElapsedMilliseconds}ms ({parseResult.Symbols.Count} symbols, {parseResult.References.Count} refs)");
-                    }
-
-                    if (parseResult.Symbols.Count > 0)
-                    {
-                        chunkSymbols.Add((relPath, parseResult.Symbols));
-                        Interlocked.Add(ref symbolsWritten, parseResult.Symbols.Count);
-                    }
-
-                    if (parseResult.References.Count > 0)
-                    {
-                        chunkRefs.Add((relPath, parseResult.References));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger?.LogWarning(ex, "Failed to parse {FilePath} — skipping", filePath);
-                }
-            });
-
-            var symbolsList = chunkSymbols.ToList();
-            var refsList = chunkRefs.ToList();
-
-            if (refsList.Count > 0)
-            {
-                allRefsList.AddRange(refsList);
-            }
-
-            var batchSymbolCount = symbolsList.Sum(s => s.Symbols.Count);
-
-            if (verbose && batchSymbolCount > 0)
-            {
-                Console.WriteLine($"[Database Batch {batchNumber}/{chunks.Count}] Writing {batchSymbolCount} symbols to database...");
-            }
-
-            var dbSw = Stopwatch.StartNew();
-            lock (db)
-            {
-                var chunkCache = db.Symbols.UpsertSymbolsBatch(symbolsList);
-                masterCache.MergeFrom(chunkCache);
-            }
-            dbSw.Stop();
-
-            if (verbose && batchSymbolCount > 0)
-            {
-                Console.WriteLine($"[Database Batch {batchNumber}/{chunks.Count}] Wrote {batchSymbolCount} symbols in {dbSw.ElapsedMilliseconds}ms.");
-            }
-        }
-
-        if (allRefsList.Count > 0)
+        var dbConsumerTask = Task.Run(async () =>
         {
-            var totalRefsCount = allRefsList.Sum(r => r.Refs.Count);
+            var symbolBatch = new List<(string RelPath, IReadOnlyList<Symbol> Symbols)>();
+            int batchCount = 0;
+
+            await foreach (var item in channel.Reader.ReadAllAsync(ct))
+            {
+                if (item.Result.Symbols.Count > 0)
+                {
+                    symbolBatch.Add((item.RelPath, item.Result.Symbols));
+                }
+
+                if (item.Result.References.Count > 0)
+                {
+                    allRefsList.Add((item.RelPath, item.Result.References));
+                }
+
+                if (symbolBatch.Count >= 250)
+                {
+                    batchCount++;
+                    FlushSymbolBatch(db, symbolBatch, masterCache, batchCount, verbose);
+                    symbolBatch.Clear();
+                }
+            }
+
+            if (symbolBatch.Count > 0)
+            {
+                batchCount++;
+                FlushSymbolBatch(db, symbolBatch, masterCache, batchCount, verbose);
+                symbolBatch.Clear();
+            }
+        }, ct);
+
+        await Parallel.ForEachAsync(files, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = Environment.ProcessorCount,
+            CancellationToken = ct
+        }, async (filePath, token) =>
+        {
+            var ext = Path.GetExtension(filePath);
+            if (!_extensionMap.TryGetValue(ext, out var parser)) return;
+
+            try
+            {
+                var relPath = WorkspacePathNormalizer.NormalizeRelativePath(repoPath, filePath);
+                var currentIdx = Interlocked.Increment(ref parsedFileCount);
+                if (verbose)
+                {
+                    Console.WriteLine($"[{currentIdx} of {totalFiles}] Starting [{parser.Language}] {relPath}...");
+                }
+
+                var fileSw = Stopwatch.StartNew();
+                var source = await File.ReadAllTextAsync(filePath, token);
+                var parseResult = parser.ParseFile(relPath, source);
+                fileSw.Stop();
+
+                if (verbose)
+                {
+                    Console.WriteLine($"[{currentIdx} of {totalFiles}] Finished [{parser.Language}] {relPath} in {fileSw.ElapsedMilliseconds}ms ({parseResult.Symbols.Count} symbols, {parseResult.References.Count} refs)");
+                }
+
+                if (parseResult.Symbols.Count > 0)
+                {
+                    Interlocked.Add(ref symbolsWritten, parseResult.Symbols.Count);
+                }
+
+                await channel.Writer.WriteAsync((relPath, parseResult), token);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Failed to parse {FilePath} — skipping", filePath);
+            }
+        });
+
+        channel.Writer.Complete();
+        await dbConsumerTask;
+
+        var allRefs = allRefsList.ToList();
+        if (allRefs.Count > 0)
+        {
+            var totalRefsCount = allRefs.Sum(r => r.Refs.Count);
             if (verbose)
             {
                 Console.WriteLine($"[Database References] Resolving and writing {totalRefsCount} references across repository graph...");
@@ -170,7 +179,7 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
             var refSw = Stopwatch.StartNew();
             lock (db)
             {
-                db.References.UpsertReferencesBatch(allRefsList, masterCache);
+                db.References.UpsertReferencesBatch(allRefs, masterCache);
             }
             refSw.Stop();
 
@@ -184,6 +193,33 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
         sw.Stop();
         logger?.LogInformation("Indexed {Symbols} symbols in {Ms}ms", symbolsWritten, sw.ElapsedMilliseconds);
         return new IndexResult(files.Count, symbolsWritten, sw.ElapsedMilliseconds);
+    }
+
+    private static void FlushSymbolBatch(
+        CodeGraphDb db,
+        List<(string RelPath, IReadOnlyList<Symbol> Symbols)> symbolBatch,
+        SymbolLookupCache masterCache,
+        int batchNumber,
+        bool verbose)
+    {
+        var count = symbolBatch.Sum(s => s.Symbols.Count);
+        if (verbose)
+        {
+            Console.WriteLine($"[Background DB Writer Batch #{batchNumber}] Writing {count} symbols to database...");
+        }
+
+        var dbSw = Stopwatch.StartNew();
+        lock (db)
+        {
+            var chunkCache = db.Symbols.UpsertSymbolsBatch(symbolBatch);
+            masterCache.MergeFrom(chunkCache);
+        }
+        dbSw.Stop();
+
+        if (verbose)
+        {
+            Console.WriteLine($"[Background DB Writer Batch #{batchNumber}] Wrote {count} symbols in {dbSw.ElapsedMilliseconds}ms.");
+        }
     }
 
 
