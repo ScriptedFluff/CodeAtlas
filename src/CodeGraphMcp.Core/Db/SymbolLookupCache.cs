@@ -49,6 +49,29 @@ public sealed class SymbolLookupCache
         fileList.Add(entry);
     }
 
+    public void MergeFrom(SymbolLookupCache other)
+    {
+        foreach (var namePair in other._byName)
+        {
+            if (!_byName.TryGetValue(namePair.Key, out var nameList))
+            {
+                nameList = [];
+                _byName[namePair.Key] = nameList;
+            }
+            nameList.AddRange(namePair.Value);
+        }
+
+        foreach (var filePair in other._byFile)
+        {
+            if (!_byFile.TryGetValue(filePair.Key, out var fileList))
+            {
+                fileList = [];
+                _byFile[filePair.Key] = fileList;
+            }
+            fileList.AddRange(filePair.Value);
+        }
+    }
+
     public long? ResolveId(string symbolName, string? preferredFilePath = null)
     {
         if (string.IsNullOrEmpty(symbolName)) return null;

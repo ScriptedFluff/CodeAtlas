@@ -72,13 +72,20 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
         logger?.LogInformation("Found {FileCount} files to process in {RepoPath} (noIgnore: {NoIgnore})", files.Count, repoPath, noIgnore);
 
 
-        const int BatchSize = 2500;
+        const int BatchSize = 250;
         int symbolsWritten = 0;
         int parsedFileCount = 0;
         int totalFiles = files.Count;
 
-        foreach (var chunk in files.Chunk(BatchSize))
+        var masterCache = new SymbolLookupCache();
+        var allRefsList = new List<(string RelPath, IReadOnlyList<SymbolReference> Refs)>();
+
+        var chunks = files.Chunk(BatchSize).ToList();
+        int batchNumber = 0;
+
+        foreach (var chunk in chunks)
         {
+            batchNumber++;
             var chunkSymbols = new System.Collections.Concurrent.ConcurrentBag<(string RelPath, IReadOnlyList<Symbol> Symbols)>();
             var chunkRefs = new System.Collections.Concurrent.ConcurrentBag<(string RelPath, IReadOnlyList<SymbolReference> Refs)>();
 
@@ -126,25 +133,50 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
             var symbolsList = chunkSymbols.ToList();
             var refsList = chunkRefs.ToList();
 
-            var batchSymbolCount = symbolsList.Sum(s => s.Symbols.Count);
-            var batchRefCount = refsList.Sum(r => r.Refs.Count);
-
-            if (verbose && (batchSymbolCount > 0 || batchRefCount > 0))
+            if (refsList.Count > 0)
             {
-                Console.WriteLine($"[Database] Writing {batchSymbolCount} symbols and {batchRefCount} references to database index...");
+                allRefsList.AddRange(refsList);
+            }
+
+            var batchSymbolCount = symbolsList.Sum(s => s.Symbols.Count);
+
+            if (verbose && batchSymbolCount > 0)
+            {
+                Console.WriteLine($"[Database Batch {batchNumber}/{chunks.Count}] Writing {batchSymbolCount} symbols to database...");
             }
 
             var dbSw = Stopwatch.StartNew();
             lock (db)
             {
-                var cache = db.Symbols.UpsertSymbolsBatch(symbolsList);
-                db.References.UpsertReferencesBatch(refsList, cache);
+                var chunkCache = db.Symbols.UpsertSymbolsBatch(symbolsList);
+                masterCache.MergeFrom(chunkCache);
             }
             dbSw.Stop();
 
-            if (verbose && (batchSymbolCount > 0 || batchRefCount > 0))
+            if (verbose && batchSymbolCount > 0)
             {
-                Console.WriteLine($"[Database] Completed writing {batchSymbolCount} symbols and {batchRefCount} references in {dbSw.ElapsedMilliseconds}ms.");
+                Console.WriteLine($"[Database Batch {batchNumber}/{chunks.Count}] Wrote {batchSymbolCount} symbols in {dbSw.ElapsedMilliseconds}ms.");
+            }
+        }
+
+        if (allRefsList.Count > 0)
+        {
+            var totalRefsCount = allRefsList.Sum(r => r.Refs.Count);
+            if (verbose)
+            {
+                Console.WriteLine($"[Database References] Resolving and writing {totalRefsCount} references across repository graph...");
+            }
+
+            var refSw = Stopwatch.StartNew();
+            lock (db)
+            {
+                db.References.UpsertReferencesBatch(allRefsList, masterCache);
+            }
+            refSw.Stop();
+
+            if (verbose)
+            {
+                Console.WriteLine($"[Database References] Completed writing {totalRefsCount} references in {refSw.ElapsedMilliseconds}ms.");
             }
         }
 
