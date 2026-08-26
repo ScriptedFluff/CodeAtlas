@@ -11,12 +11,17 @@ public interface IWorkspaceBufferManager
 
 public sealed class WorkspaceBufferManager : IWorkspaceBufferManager
 {
-    private readonly IReadOnlyList<ILanguageParser> _parsers;
+    private readonly IParserRegistry _parserRegistry;
     private readonly ConcurrentDictionary<string, Lazy<DirtyFileBuffer>> _buffers = new(StringComparer.OrdinalIgnoreCase);
 
-    public WorkspaceBufferManager(IReadOnlyList<ILanguageParser> parsers)
+    public WorkspaceBufferManager(IParserRegistry parserRegistry)
     {
-        _parsers = parsers;
+        _parserRegistry = parserRegistry;
+    }
+
+    public WorkspaceBufferManager(IReadOnlyList<ILanguageParser> parsers)
+        : this(new ParserRegistry(parsers))
+    {
     }
 
     public DirtyFileBuffer GetOrCreateBuffer(string targetDirectory)
@@ -25,7 +30,7 @@ public sealed class WorkspaceBufferManager : IWorkspaceBufferManager
 
         var lazyBuf = _buffers.GetOrAdd(workspaceRoot, rootKey => new Lazy<DirtyFileBuffer>(() =>
         {
-            var buf = new DirtyFileBuffer(rootKey, _parsers);
+            var buf = new DirtyFileBuffer(rootKey, _parserRegistry);
             buf.Refresh();
             return buf;
         }, LazyThreadSafetyMode.ExecutionAndPublication));

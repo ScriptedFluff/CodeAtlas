@@ -5,6 +5,7 @@ namespace CodeGraphMcp.Parser;
 
 public sealed class TypeScriptParser : JsTsParserBase, ILanguageParser
 {
+    public ParserMetadata Metadata => new("typescript", "TypeScript Parser", "1.0.0", "TypeScript and TSX TreeSitter parser", "CodeGraphMcp");
     public IReadOnlyList<string> FileExtensions => [".ts", ".tsx"];
     public string Language => "typescript";
 
@@ -27,7 +28,6 @@ public sealed class TypeScriptParser : JsTsParserBase, ILanguageParser
         (type_alias_declaration
             name: (type_identifier) @typealias.name) @typealias.def
         """;
-
 
     public FileParseResult ParseFile(string filePath, string source)
     {
@@ -105,7 +105,6 @@ public sealed class TypeScriptParser : JsTsParserBase, ILanguageParser
 
     public IEnumerable<SymbolReference> ParseReferences(string filePath, string source)
         => ParseFile(filePath, source).References;
-
 
     private static void WalkForReferences(Node node, string filePath, List<SymbolReference> refs, string? enclosingSymbol)
     {

@@ -39,6 +39,10 @@ public static class MigrationRunner
         {
             ApplyMigration(connection, 5, M005_IsPartialColumn);
         }
+        if (currentVersion < 6)
+        {
+            ApplyMigration(connection, 6, M006_IndexedParsers);
+        }
     }
 
 
@@ -125,6 +129,16 @@ public static class MigrationRunner
 
     private const string M005_IsPartialColumn = """
         ALTER TABLE symbols ADD COLUMN is_partial INTEGER NOT NULL DEFAULT 0;
+        """;
+
+    private const string M006_IndexedParsers = """
+        CREATE TABLE IF NOT EXISTS indexed_parsers (
+            parser_id   TEXT PRIMARY KEY,
+            language    TEXT NOT NULL,
+            extensions  TEXT NOT NULL,
+            version     TEXT NOT NULL,
+            indexed_at  TEXT NOT NULL
+        );
         """;
 }
 

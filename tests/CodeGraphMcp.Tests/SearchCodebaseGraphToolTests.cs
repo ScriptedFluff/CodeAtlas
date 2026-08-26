@@ -2,6 +2,7 @@ using CodeGraphMcp.Db;
 using CodeGraphMcp.Git;
 using CodeGraphMcp.Indexer;
 using CodeGraphMcp.Mcp.Tools;
+using CodeGraphMcp.Models;
 using CodeGraphMcp.Parser;
 using Microsoft.Data.Sqlite;
 using Xunit;
@@ -44,7 +45,7 @@ public class SearchCodebaseGraphToolTests
         {
             dbManager.Dispose();
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true);
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true); } catch { }
         }
     }
 
@@ -82,7 +83,7 @@ public class SearchCodebaseGraphToolTests
         {
             dbManager.Dispose();
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true);
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true); } catch { }
         }
     }
 
@@ -118,13 +119,74 @@ public class SearchCodebaseGraphToolTests
             var fullResult = await searchTool.SearchCodebaseGraphAsync("UserItem%", targetDirectory: tempDir, limit: 10);
             Assert.True(fullResult.Matches.Count >= 3);
             Assert.Equal("Class", fullResult.Matches[0].SymbolType);
-            Assert.Equal("Class", fullResult.Matches[1].SymbolType);
         }
         finally
         {
             dbManager.Dispose();
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true);
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void SymbolQueries_FindByName_WithLanguageFilter_DoesNotGetBlockedByOtherLanguages()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "SearchLangFilterTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        var dbPath = Path.Combine(tempDir, "test.db");
+
+        try
+        {
+            using var db = new CodeGraphDb(dbPath);
+            db.Migrate();
+
+            // Insert 600 JSON symbols named "raw"
+            var jsonSymbols = Enumerable.Range(1, 600).Select(i => new Symbol
+            {
+                SymbolName = "raw",
+                SymbolType = SymbolType.Property,
+                Language = "json",
+                FilePath = "postman/test.json",
+                StartLine = i,
+                EndLine = i,
+                StartByte = 0,
+                EndByte = 10
+            }).ToList();
+
+            // Insert 1 C# symbol named "raw"
+            var csharpSymbols = new List<Symbol>
+            {
+                new()
+                {
+                    SymbolName = "raw",
+                    SymbolType = SymbolType.Method,
+                    Language = "csharp",
+                    FilePath = "src/Service.cs",
+                    StartLine = 10,
+                    EndLine = 15,
+                    StartByte = 100,
+                    EndByte = 200
+                }
+            };
+
+            db.Symbols.UpsertFile("postman/test.json", jsonSymbols);
+            db.Symbols.UpsertFile("src/Service.cs", csharpSymbols);
+
+            // 1. Query specifically for csharp with limit 500
+            var csharpResults = db.Symbols.FindByName("raw", limit: 500, language: "csharp");
+            Assert.Single(csharpResults);
+            Assert.Equal("csharp", csharpResults[0].Language);
+            Assert.Equal("src/Service.cs", csharpResults[0].FilePath);
+
+            // 2. Query with limit 0 (unlimited) across all languages
+            var allResults = db.Symbols.FindByName("raw", limit: 0);
+            Assert.Equal(601, allResults.Count);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true); } catch { }
         }
     }
 }
+

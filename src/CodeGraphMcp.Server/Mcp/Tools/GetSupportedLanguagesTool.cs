@@ -12,8 +12,20 @@ public sealed record SupportedLanguagesResult(
     IReadOnlyList<SupportedLanguageInfo> SupportedLanguages);
 
 [McpServerToolType]
-public sealed class GetSupportedLanguagesTool(IReadOnlyList<ILanguageParser> parsers)
+public sealed class GetSupportedLanguagesTool
 {
+    private readonly IParserRegistry _parserRegistry;
+
+    public GetSupportedLanguagesTool(IParserRegistry parserRegistry)
+    {
+        _parserRegistry = parserRegistry;
+    }
+
+    public GetSupportedLanguagesTool(IReadOnlyList<ILanguageParser> parsers)
+        : this(new ParserRegistry(parsers))
+    {
+    }
+
     [McpServerTool]
     [Description("""
         Lists the programming languages and file extensions currently supported by CodeGraphMcp.
@@ -21,7 +33,7 @@ public sealed class GetSupportedLanguagesTool(IReadOnlyList<ILanguageParser> par
         """)]
     public Task<SupportedLanguagesResult> GetSupportedLanguagesAsync(CancellationToken ct = default)
     {
-        var languages = parsers
+        var languages = _parserRegistry.GetAllParsers()
             .Select(p => new SupportedLanguageInfo(p.Language, p.FileExtensions))
             .DistinctBy(l => l.Language, StringComparer.OrdinalIgnoreCase)
             .ToList();

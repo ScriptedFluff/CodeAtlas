@@ -8,12 +8,29 @@ namespace CodeGraphMcp.Git;
 /// Determines which files have changed since the last indexed commit
 /// and drives re-parsing of only those files.
 /// </summary>
-public sealed class DeltaEngine(
-    string repoPath,
-    CodeGraphDb db,
-    IReadOnlyList<ILanguageParser> parsers)
+public sealed class DeltaEngine
 {
-    private readonly Dictionary<string, ILanguageParser> _extensionMap = BuildMap(parsers);
+    private readonly string repoPath;
+    private readonly CodeGraphDb db;
+    private readonly IParserRegistry _parserRegistry;
+
+    public DeltaEngine(
+        string repoPath,
+        CodeGraphDb db,
+        IParserRegistry parserRegistry)
+    {
+        this.repoPath = repoPath;
+        this.db = db;
+        _parserRegistry = parserRegistry;
+    }
+
+    public DeltaEngine(
+        string repoPath,
+        CodeGraphDb db,
+        IReadOnlyList<ILanguageParser> parsers)
+        : this(repoPath, db, new ParserRegistry(parsers))
+    {
+    }
 
     public sealed record DeltaResult(
         int FilesChanged,
@@ -48,14 +65,74 @@ public sealed class DeltaEngine(
         var branch     = GitHelpers.GetCurrentBranch(repoPath) ?? "unknown";
         var dirtyFiles = GitHelpers.GetDirtyFiles(repoPath);
 
-        // ── NOOP ──────────────────────────────────────────────────────────────
-        if (headHash is not null && headHash == lastHash && dirtyFiles.Count == 0)
+        var activeParsers = _parserRegistry.GetAllParsers();
+        var indexedParsers = db.IndexedParsers.GetIndexedParsers();
+        var indexedMap = indexedParsers.ToDictionary(p => p.ParserId, StringComparer.OrdinalIgnoreCase);
+        var activeMap = activeParsers.ToDictionary(p => p.Metadata.Id, StringComparer.OrdinalIgnoreCase);
+
+        // Find newly added or re-enabled parsers (or updated versions/extensions)
+        var addedParsers = activeParsers.Where(p =>
+            !indexedMap.TryGetValue(p.Metadata.Id, out var rec) ||
+            !string.Equals(rec.Version, p.Metadata.Version, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(rec.Extensions, string.Join(",", p.FileExtensions), StringComparison.OrdinalIgnoreCase)
+        ).ToList();
+
+        // Find removed or disabled parsers
+        var removedParsers = indexedParsers.Where(p => !activeMap.ContainsKey(p.ParserId)).ToList();
+
+        int symbolsDeleted = 0;
+
+        // Clean up symbols from removed/disabled parsers
+        if (removedParsers.Count > 0)
         {
+            lock (db)
+            {
+                foreach (var p in removedParsers)
+                {
+                    var count = db.Symbols.DeleteByLanguage(p.Language);
+                    symbolsDeleted += count;
+                    db.IndexedParsers.RemoveIndexedParser(p.ParserId);
+                }
+            }
+        }
+
+        // Discover files for newly added parsers
+        var addedParserFiles = new List<string>();
+        if (addedParsers.Count > 0)
+        {
+            var newExtensions = addedParsers.SelectMany(p => p.FileExtensions).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var orchestrator = new Indexer.IndexOrchestrator(db, _parserRegistry);
+            var discoveredFiles = orchestrator.EnumerateFiles(repoPath, noIgnore);
+            foreach (var file in discoveredFiles)
+            {
+                var ext = Path.GetExtension(file);
+                if (newExtensions.Contains(ext))
+                {
+                    var relPath = Path.GetRelativePath(repoPath, file).Replace('\\', '/');
+                    addedParserFiles.Add(relPath);
+                }
+            }
+        }
+
+        // ── NOOP ──────────────────────────────────────────────────────────────
+        if (headHash is not null && headHash == lastHash && dirtyFiles.Count == 0 && addedParserFiles.Count == 0 && removedParsers.Count == 0)
+        {
+            if (addedParsers.Count > 0)
+            {
+                lock (db)
+                {
+                    db.IndexedParsers.RecordAllIndexedParsers(addedParsers);
+                }
+            }
+
             sw.Stop();
             return new DeltaResult(0, 0, 0, 0, sw.ElapsedMilliseconds, "noop");
         }
 
-        string mode = "delta";
+        string mode = addedParserFiles.Count > 0 && headHash == lastHash && dirtyFiles.Count == 0
+            ? "parser-delta"
+            : "delta";
+
         string? seedSourcePath = null;
         string? seedCommitHash = null;
 
@@ -63,7 +140,6 @@ public sealed class DeltaEngine(
         {
             var seedResult = DbSeedingService.TrySeedDatabase(repoPath, db);
             if (seedResult is not null)
-
             {
                 lastHash = seedResult.SourceCommitHash;
                 seedSourcePath = seedResult.SourceDbPath;
@@ -72,11 +148,10 @@ public sealed class DeltaEngine(
             }
         }
 
-
         // ── FULL (first run, detached HEAD, or empty repo) ────────────────────
         if (lastHash is null || headHash is null)
         {
-            var orchestrator = new Indexer.IndexOrchestrator(db);
+            var orchestrator = new Indexer.IndexOrchestrator(db, _parserRegistry);
             var result = await orchestrator.IndexAsync(repoPath, noIgnore, verbose, ct);
 
             var finalHash = headHash ?? "unknown";
@@ -95,16 +170,15 @@ public sealed class DeltaEngine(
 
         var changedFiles = committedChanged
             .Concat(dirtyFiles)
+            .Concat(addedParserFiles)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        int symbolsDeleted = 0;
-        int symbolsAdded   = 0;
-        int reindexed      = 0;
+        int symbolsAdded = 0;
+        int reindexed    = 0;
 
         var fileSymbols = new System.Collections.Concurrent.ConcurrentBag<(string FilePath, IReadOnlyList<Symbol> Symbols)>();
         var fileRefs = new System.Collections.Concurrent.ConcurrentBag<(string FilePath, IReadOnlyList<SymbolReference> Refs)>();
-
 
         await Parallel.ForEachAsync(changedFiles, new ParallelOptions
         {
@@ -113,7 +187,8 @@ public sealed class DeltaEngine(
         }, async (relPath, token) =>
         {
             var ext = Path.GetExtension(relPath);
-            if (!_extensionMap.TryGetValue(ext, out var parser)) return;
+            var parser = _parserRegistry.GetParserForExtension(ext);
+            if (parser == null) return;
 
             var normPath = relPath.Replace('\\', '/');
             var fullPath = Path.Combine(repoPath, relPath);
@@ -162,6 +237,7 @@ public sealed class DeltaEngine(
             var cache = db.Symbols.UpsertSymbolsBatch(symbolsList);
             db.References.UpsertReferencesBatch(refsList, cache);
             db.IndexState.SetIndexState(branch, headHash, 0);
+            db.IndexedParsers.RecordAllIndexedParsers(activeParsers);
         }
 
         sw.Stop();
@@ -171,15 +247,5 @@ public sealed class DeltaEngine(
             symbolsDeleted, symbolsAdded,
             sw.ElapsedMilliseconds, mode,
             seedSourcePath, seedCommitHash);
-    }
-
-
-    private static Dictionary<string, ILanguageParser> BuildMap(IReadOnlyList<ILanguageParser> parsers)
-    {
-        var map = new Dictionary<string, ILanguageParser>(StringComparer.OrdinalIgnoreCase);
-        foreach (var p in parsers)
-            foreach (var ext in p.FileExtensions)
-                map[ext] = p;
-        return map;
     }
 }

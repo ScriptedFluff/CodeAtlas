@@ -5,6 +5,7 @@ namespace CodeGraphMcp.Parser;
 
 public sealed partial class HtmlParser : ILanguageParser
 {
+    public ParserMetadata Metadata => new("html", "HTML & XML Parser", "1.0.0", "HTML, XML, and template parser", "CodeGraphMcp");
     public IReadOnlyList<string> FileExtensions => [".html", ".htm", ".cshtml", ".razor", ".xml", ".csproj", ".config", ".vcxproj", ".props"];
     public string Language => "html";
 

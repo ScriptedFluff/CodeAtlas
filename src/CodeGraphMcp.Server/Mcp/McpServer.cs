@@ -35,12 +35,13 @@ public static class McpServer
         builder.Services
             .AddSingleton<RepoContext>(_ => new RepoContext(repoPath))
             .AddSingleton(_ => parsers)
+            .AddSingleton<IParserRegistry>(sp => new ParserRegistry(sp.GetRequiredService<IReadOnlyList<ILanguageParser>>()))
             .AddSingleton<IWorkspaceDbManager>(_ => new WorkspaceDbManager(dbDirOverride: dbPath))
             .AddSingleton<IWorkspaceBufferManager>(sp =>
-                new WorkspaceBufferManager(sp.GetRequiredService<IReadOnlyList<ILanguageParser>>()))
+                new WorkspaceBufferManager(sp.GetRequiredService<IParserRegistry>()))
             .AddSingleton<IWorkspaceLinkerManager, WorkspaceLinkerManager>()
             .AddSingleton<IDynamicWorkspaceService>(sp =>
-                new DynamicWorkspaceService(sp.GetRequiredService<IWorkspaceDbManager>(), repoPath))
+                new DynamicWorkspaceService(sp.GetRequiredService<IWorkspaceDbManager>(), repoPath, sp.GetRequiredService<IParserRegistry>()))
             .AddSingleton(sp =>
             {
                 var dbManager = sp.GetRequiredService<IWorkspaceDbManager>();
@@ -93,13 +94,5 @@ public static class McpServer
     }
 
     private static IReadOnlyList<ILanguageParser> GetParsers() =>
-    [
-        new CSharpParser(),
-        new TypeScriptParser(),
-        new HtmlParser(),
-        new PowerShellParser(),
-        new JsonParser(),
-        new YamlParser(),
-        new CssParser()
-    ];
+        ParserRegistry.CreateDefault().GetAllParsers();
 }

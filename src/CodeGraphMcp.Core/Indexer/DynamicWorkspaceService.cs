@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using CodeGraphMcp.Config;
 using CodeGraphMcp.Db;
+using CodeGraphMcp.Parser;
 using Microsoft.Extensions.Logging;
 
 namespace CodeGraphMcp.Indexer;
@@ -16,6 +17,7 @@ public interface IDynamicWorkspaceService
 public sealed class DynamicWorkspaceService : IDynamicWorkspaceService
 {
     private readonly IWorkspaceDbManager _dbManager;
+    private readonly IParserRegistry _parserRegistry;
     private readonly string? _defaultRepoPath;
     private readonly ILogger<DynamicWorkspaceService>? _logger;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new(StringComparer.OrdinalIgnoreCase);
@@ -23,10 +25,12 @@ public sealed class DynamicWorkspaceService : IDynamicWorkspaceService
     public DynamicWorkspaceService(
         IWorkspaceDbManager dbManager,
         string? defaultRepoPath = null,
+        IParserRegistry? parserRegistry = null,
         ILogger<DynamicWorkspaceService>? logger = null)
     {
         _dbManager = dbManager;
         _defaultRepoPath = defaultRepoPath;
+        _parserRegistry = parserRegistry ?? ParserRegistry.CreateDefault();
         _logger = logger;
     }
 
@@ -56,7 +60,7 @@ public sealed class DynamicWorkspaceService : IDynamicWorkspaceService
             if (symbolCount == 0)
             {
                 _logger?.LogInformation("Workspace {WorkspaceRoot} is un-indexed. Initializing index...", workspaceRoot);
-                var orchestrator = new IndexOrchestrator(db);
+                var orchestrator = new IndexOrchestrator(db, _parserRegistry);
                 var result = await orchestrator.IndexAsync(workspaceRoot, ct);
                 _logger?.LogInformation("Auto-indexed {Symbols} symbols across {Files} files in {Ms}ms for {WorkspaceRoot}",
                     result.SymbolsWritten, result.FilesProcessed, result.ElapsedMs, workspaceRoot);

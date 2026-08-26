@@ -50,3 +50,21 @@ This document tracks candidate features and enhancements for `CodeGraphMcp` deri
     - **Minimal Context Cost**: Adds only a single boolean field (`hasMore: true/false`) to the response payload.
 - **Current Client Workaround**: If `hasMore` is omitted entirely, clients rely on receiving fewer matches than `limit` (or an empty array `[]`) to determine when the final page of search results has been reached.
 
+### 8. On-Demand / Lazy Language Parser Instantiation
+- **Status**: Proposed
+- **Description**: Refactor `IndexOrchestrator.cs` `BuildExtensionMap()` to lazily instantiate language parsers (`CSharpParser`, `TypeScriptParser`, `TreeSitter` instances) only when files of that specific extension are encountered or queried in the repository.
+- **Goal**: Reduce baseline memory footprint and recover cold indexing performance on repositories using a subset of supported languages.
+
+### 9. Language-Agnostic Parser-Driven Symbol Merging (Multi-Location Contract)
+- **Status**: Proposed
+- **Description**: Keep core `IndexOrchestrator` and `CodeGraphDb` symbol storage language-agnostic by extending the `ILanguageParser` contract. Parsers can individually flag symbols as mergeable/partial (`IsPartial = true`), delegating multi-file symbol declaration aggregation (C# `partial class`, TypeScript `interface` declaration merging, etc.) to the individual parser implementations while the core DB engine transparently returns location line-range arrays (`Locations: [{ File, StartLine, EndLine }]`).
+- **Goal**: Enable multi-file symbol aggregation without adding language-specific branching or hardcoded logic to the core index engine.
+
+### 10. Worktree Path Mismatch Warning & Safety Guardrails
+- **Status**: Proposed
+- **Description**: Implement runtime detection to verify if CLI or MCP server commands are executing within a subfolder or git worktree that differs from the index database root, issuing clear warning diagnostics to prevent stale cross-worktree queries.
+
+
+
+
+

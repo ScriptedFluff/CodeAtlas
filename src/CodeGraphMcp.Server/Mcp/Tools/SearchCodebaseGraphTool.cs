@@ -70,18 +70,20 @@ public sealed class SearchCodebaseGraphTool(
         var buffer = bufferManager.GetOrCreateBuffer(context.WorkspaceRoot);
 
         var normLang = CodeGraphMcp.Config.LanguageNormalizer.Normalize(language);
+        var parsedType = Enum.TryParse<SymbolType>(symbolType, true, out var st) ? st : (SymbolType?)null;
 
         var effectiveLimit = limit <= 0 ? 500 : Math.Min(limit, 500);
         var effectiveOffset = Math.Max(0, offset);
         var dbFetchLimit = Math.Max(effectiveOffset + effectiveLimit, 500);
 
         // 1. SQLite results
-        var dbMatches = db.Symbols.FindByName(pattern, dbFetchLimit)
+        var dbMatches = db.Symbols.FindByName(
+                pattern,
+                limit: dbFetchLimit,
+                offset: 0,
+                language: normLang,
+                symbolType: parsedType)
             .Where(s => !exactMatch || s.SymbolName.Equals(pattern, StringComparison.OrdinalIgnoreCase))
-            .Where(s => symbolType is null
-                || s.SymbolType.ToString().Equals(symbolType, StringComparison.OrdinalIgnoreCase))
-            .Where(s => normLang is null
-                || (s.Language ?? "").Equals(normLang, StringComparison.OrdinalIgnoreCase))
             .Where(s => compiledRegex is null || compiledRegex.IsMatch(s.SymbolName))
             .Select(s => new SearchMatch(
                 s.SymbolName, s.SymbolType.ToString(), s.Language,

@@ -27,6 +27,14 @@
     <ProjectReference Include="..\..\src\CodeGraphMcp.Core\CodeGraphMcp.Core.csproj" />
     <ProjectReference Include="..\..\src\CodeGraphMcp.Server\CodeGraphMcp.Server.csproj" />
     <ProjectReference Include="..\..\src\CodeGraphMcp.Cli\CodeGraphMcp.Cli.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeGraphMcp.Parsers.CSharp\CodeGraphMcp.Parsers.CSharp.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeGraphMcp.Parsers.TypeScript\CodeGraphMcp.Parsers.TypeScript.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeGraphMcp.Parsers.JavaScript\CodeGraphMcp.Parsers.JavaScript.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeGraphMcp.Parsers.Html\CodeGraphMcp.Parsers.Html.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeGraphMcp.Parsers.PowerShell\CodeGraphMcp.Parsers.PowerShell.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeGraphMcp.Parsers.Json\CodeGraphMcp.Parsers.Json.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeGraphMcp.Parsers.Yaml\CodeGraphMcp.Parsers.Yaml.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeGraphMcp.Parsers.Css\CodeGraphMcp.Parsers.Css.csproj" />
   </ItemGroup>
 
 </Project>

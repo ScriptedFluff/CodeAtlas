@@ -82,6 +82,15 @@ public sealed class SymbolQueries(SqliteConnection connection)
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>Deletes all symbols associated with a specific language.</summary>
+    public int DeleteByLanguage(string language)
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "DELETE FROM symbols WHERE language = @language;";
+        cmd.Parameters.AddWithValue("@language", language);
+        return cmd.ExecuteNonQuery();
+    }
+
     /// <summary>Returns symbol count for a single file path.</summary>
     public int CountByFile(string filePath)
     {
@@ -170,24 +179,43 @@ public sealed class SymbolQueries(SqliteConnection connection)
     }
 
 
-    /// <summary>Find symbols by name (exact or substring match, case-insensitive) with pagination support.</summary>
-    public IReadOnlyList<Symbol> FindByName(string symbolName, int limit = 500, int offset = 0)
+    /// <summary>Find symbols by name (exact or substring match, case-insensitive) with optional language, type filtering, and pagination.</summary>
+    public IReadOnlyList<Symbol> FindByName(
+        string symbolName,
+        int limit = 500,
+        int offset = 0,
+        string? language = null,
+        SymbolType? symbolType = null)
     {
         using var cmd = connection.CreateCommand();
-        cmd.CommandText = """
+        var sql = """
             SELECT id, symbol_name, symbol_type, class_name, language,
                    file_path, start_line, end_line, start_byte, end_byte,
                    signature, doc_comment, is_partial
             FROM symbols
-            WHERE symbol_name = @exact COLLATE NOCASE
-               OR symbol_name LIKE @pattern COLLATE NOCASE
+            WHERE (symbol_name = @exact COLLATE NOCASE OR symbol_name LIKE @pattern COLLATE NOCASE)
+              AND (@language IS NULL OR language = @language COLLATE NOCASE)
+              AND (@symbolType IS NULL OR symbol_type = @symbolType)
             ORDER BY CASE WHEN symbol_name = @exact COLLATE NOCASE THEN 0 ELSE 1 END, file_path, start_line
-            LIMIT @limit OFFSET @offset
             """;
+
+        if (limit > 0)
+        {
+            sql += " LIMIT @limit OFFSET @offset";
+            cmd.Parameters.AddWithValue("@limit", limit);
+            cmd.Parameters.AddWithValue("@offset", Math.Max(0, offset));
+        }
+        else if (offset > 0)
+        {
+            sql += " LIMIT -1 OFFSET @offset";
+            cmd.Parameters.AddWithValue("@offset", offset);
+        }
+
+        cmd.CommandText = sql;
         cmd.Parameters.AddWithValue("@exact", symbolName);
         cmd.Parameters.AddWithValue("@pattern", $"%{symbolName}%");
-        cmd.Parameters.AddWithValue("@limit", limit);
-        cmd.Parameters.AddWithValue("@offset", Math.Max(0, offset));
+        cmd.Parameters.AddWithValue("@language", (object?)language ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@symbolType", symbolType.HasValue ? symbolType.Value.ToString() : DBNull.Value);
 
         var results = new List<Symbol>();
         using var reader = cmd.ExecuteReader();

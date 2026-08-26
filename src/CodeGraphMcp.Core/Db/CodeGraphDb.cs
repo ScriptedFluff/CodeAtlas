@@ -12,6 +12,7 @@ public sealed class CodeGraphDb : IDisposable
     public ReferenceQueries References { get; }
     public IndexStateQueries IndexState { get; }
     public CrossStackQueries CrossStack { get; }
+    public IndexedParserQueries IndexedParsers { get; }
 
 
     public CodeGraphDb(string dbPath, bool readOnly = false)
@@ -38,10 +39,11 @@ public sealed class CodeGraphDb : IDisposable
             wal.ExecuteNonQuery();
         }
 
-        Symbols    = new SymbolQueries(_connection);
-        References = new ReferenceQueries(_connection);
-        IndexState = new IndexStateQueries(_connection);
-        CrossStack = new CrossStackQueries(_connection);
+        Symbols        = new SymbolQueries(_connection);
+        References     = new ReferenceQueries(_connection);
+        IndexState     = new IndexStateQueries(_connection);
+        CrossStack     = new CrossStackQueries(_connection);
+        IndexedParsers = new IndexedParserQueries(_connection);
     }
 
     public void Migrate()

@@ -5,6 +5,7 @@ namespace CodeGraphMcp.Parser;
 
 public sealed partial class YamlParser : ILanguageParser
 {
+    public ParserMetadata Metadata => new("yaml", "YAML Parser", "1.0.0", "YAML AST parser", "CodeGraphMcp");
     public IReadOnlyList<string> FileExtensions => [".yaml", ".yml"];
     public string Language => "yaml";
 

@@ -6,6 +6,7 @@ namespace CodeGraphMcp.Parser;
 
 public sealed partial class JsonParser : ILanguageParser
 {
+    public ParserMetadata Metadata => new("json", "JSON Parser", "1.0.0", "JSON AST parser", "CodeGraphMcp");
     public IReadOnlyList<string> FileExtensions => [".json"];
     public string Language => "json";
 

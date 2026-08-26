@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <AssemblyName>CodeGraphMcp</AssemblyName>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -9,18 +10,12 @@
     <Authors>Garry Flanagan</Authors>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
 
-    <!-- Native AOT -->
-    <PublishAot>true</PublishAot>
+    <!-- High-performance ReadyToRun deployment (supports dynamic ALC plugin loading) -->
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <SelfContained>false</SelfContained>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <StripSymbols>true</StripSymbols>
-
-    <!-- Trim analysis -->
-    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
   </PropertyGroup>
-
-  <ItemGroup>
-    <TrimmerRootAssembly Include="CodeGraphMcp.Cli" />
-  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\CodeGraphMcp.Core\CodeGraphMcp.Core.csproj" />

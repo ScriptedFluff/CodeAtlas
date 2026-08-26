@@ -5,6 +5,7 @@ namespace CodeGraphMcp.Parser;
 
 public sealed partial class PowerShellParser : ILanguageParser
 {
+    public ParserMetadata Metadata => new("powershell", "PowerShell Parser", "1.0.0", "PowerShell script and module parser", "CodeGraphMcp");
     public IReadOnlyList<string> FileExtensions => [".ps1", ".psm1", ".psd1"];
     public string Language => "powershell";
 

@@ -1,6 +1,6 @@
 # CodeGraphMcp — Developer Technical Specification & Command Architecture
 
-`CodeGraphMcp` is a high-performance local code knowledge graph indexer, reference graph analysis engine, and Model Context Protocol (MCP) server designed for software architects and senior engineers. It parses multi-language source trees (C#, TypeScript, JavaScript, HTML, PowerShell), extracts syntax trees into relational SQLite graphs, tracks Git deltas for sub-second incremental indexing, performs cross-stack ServiceStack DTO linkage, and surfaces dirty uncommitted file modifications live to AI coding assistants.
+`CodeGraphMcp` is a high-performance local code knowledge graph indexer, reference graph analysis engine, and Model Context Protocol (MCP) server designed for software architects and senior engineers. It parses multi-language source trees (C#, TypeScript, JavaScript, HTML, PowerShell, JSON, YAML, CSS), extracts syntax trees into relational SQLite graphs, tracks Git deltas for sub-second incremental indexing, performs cross-stack ServiceStack DTO linkage, and surfaces dirty uncommitted file modifications live to AI coding assistants.
 
 ---
 
@@ -13,37 +13,54 @@ CodeGraphMcp.slnx
 │   │   ├── Config/                # CodeGraphSettings, StorageConfig, WorkspacePathResolver
 │   │   ├── Db/                    # SqliteDbFactory, Schema Migrations, Symbol Repositories, WorktreePruner
 │   │   ├── Indexer/               # IndexOrchestrator, SolutionRootResolver, DynamicWorkspaceService
-│   │   ├── Parser/                # C#, TS/JS, HTML, CSS, JSON, YAML, PowerShell Parsers
+│   │   ├── Parser/                # ILanguageParser, ParserRegistry, IParserRegistry, ParserMetadata
+│   │   ├── Plugins/               # ParserLoadContext, DirectoryParserPluginLoader, ParserSecurityEvaluator
 │   │   ├── Git/                   # GitHelpers, DeltaEngine, DirtyFileBuffer, GitIgnoreMatcher
 │   │   ├── CrossStack/            # ServiceStack DTO Contract Resolver & Linkers
 │   │   └── Models/                # Symbol, SymbolReference, IndexResult, CallerEntry
 │   │
-│   ├── CodeGraphMcp.Server/       # Executable (.exe) - MCP Daemon Host (Native AOT)
+│   ├── Parsers/                   # Standalone Drop-in Language Parser Plugins
+│   │   ├── CodeGraphMcp.Parsers.CSharp/
+│   │   ├── CodeGraphMcp.Parsers.TypeScript/
+│   │   ├── CodeGraphMcp.Parsers.JavaScript/
+│   │   ├── CodeGraphMcp.Parsers.Html/
+│   │   ├── CodeGraphMcp.Parsers.PowerShell/
+│   │   ├── CodeGraphMcp.Parsers.Json/
+│   │   ├── CodeGraphMcp.Parsers.Yaml/
+│   │   └── CodeGraphMcp.Parsers.Css/
+│   │
+│   ├── CodeGraphMcp.Server/       # Executable (.exe) - MCP Daemon Host (ReadyToRun)
 │   │   ├── Mcp/                   # 7 MCP Tool Registrations & JSON-RPC Dispatcher
 │   │   └── Program.cs             # Entry point for stdio MCP daemon host
 │   │
-│   └── CodeGraphMcp.Cli/          # Executable (.exe) - Command Line Utility (Native AOT)
-│       ├── Commands/              # IndexCommand, QueryCommand, StatusCommand, PruneCommand, WatchCommand
+│   └── CodeGraphMcp.Cli/          # Executable (.exe) - Command Line Utility (ReadyToRun)
+│       ├── Commands/              # Index, Query, Status, Parsers, Prune, Watch, Serve
 │       └── Program.cs             # Entry point for CLI command runner
 ```
 
 ### Decoupled Subsystem Responsibilities
 
 1. **Core Domain Library (`CodeGraphMcp.Core`)**:
-    - **AST Parsing & Streaming Indexing Pipeline**: Roslyn C# parser, Tree-sitter parsers (TS/JS, HTML, CSS, JSON, YAML), and PowerShell AST parser. Uses a `Channel`-based Producer-Consumer pipeline to stream parsed AST results asynchronously from parallel CPU workers to a background SQLite writer task in 250-file batches without CPU idle time.
-    - **Language Normalizer**: Maps query language aliases (`ps1`, `ps`, `cs`, `c#`, `ts`, `js`, `py`, `yml`) to canonical language strings (`powershell`, `csharp`, `typescript`, `javascript`, `python`, `yaml`).
+    - **Dynamic Plugin Engine (`Plugins/`)**: Loads drop-in parser assemblies into collectible `AssemblyLoadContext` instances. Delegates `CodeGraphMcp.Core` and `TreeSitter` to host ALC to preserve type identity for `ILanguageParser` and `TreeSitter.Node`.
+    - **Multi-Tier Directory Resolver (`ParserDirectoryResolver`)**: Scans `Environment` (`CODEGRAPH_PARSERS_DIR`), `User` (`%LOCALAPPDATA%\CodeGraphMcp\Parsers`), and `Application` (`{AppBase}\Parsers`) locations.
+    - **Security Policy Engine (`ParserSecurityEvaluator`)**: Prevents DLL hijacking and unprivileged shadowing (`Strict`, `AllowAll`, `AllowList`).
+    - **Streaming Indexing Pipeline**: Uses a `Channel`-based Producer-Consumer pipeline to stream parsed AST results asynchronously from parallel CPU workers to a background SQLite writer task in 250-file batches without CPU idle time.
     - **Git Delta Tracker**: `git diff` interrogation against `last_indexed_commit` for sub-second incremental indexing.
     - **Relational Knowledge Graph**: SQLite WAL-mode repository layer (`Dapper`) storing symbol definitions, references, and DTO mappings.
     - **Live Dirty Buffer Interceptor**: Merges uncommitted file edits on disk with SQLite records for zero-latency accuracy.
     - **Worktree Pruner**: Orphaned database purge utility reclaiming disk space.
-    - **Default Ignore Rules**: Automatically excludes `.codegraph`, `node_modules`, `bin`, `obj`, `dist`, `.next`, `coverage`, `.vs`, `packages`, `publish`, `out`, `temp`, `tmp`, `vendor`, `.idea`, `lib`, and `wwwroot/lib` (plus `**/wwwroot/lib/**`).
 
-2. **MCP Daemon Host (`CodeGraphMcp.Server`)**:
-   - Implements JSON-RPC 2.0 over standard I/O streams (`stdio`) via `ModelContextProtocol.Server`.
-   - Exposes 7 specialized knowledge graph tools directly to AI assistants (Antigravity, Claude Desktop, Cursor, Copilot).
+2. **Standalone Parser Plugins (`src/Parsers/`)**:
+    - Decoupled projects compiled independently and output into `Parsers/<ParserName>/`.
+    - Implements `ILanguageParser` and declares `ParserMetadata` (ID, language, file extensions, version, author).
 
-3. **CLI Utility Launcher (`CodeGraphMcp.Cli` / `cg`)**:
-   - Light command-line utility built on `System.CommandLine`.
+3. **MCP Daemon Host (`CodeGraphMcp.Server`)**:
+    - Implements JSON-RPC 2.0 over standard I/O streams (`stdio`) via `ModelContextProtocol.Server`.
+    - Exposes 7 specialized knowledge graph tools directly to AI assistants.
+
+4. **CLI Utility Launcher (`CodeGraphMcp.Cli` / `cg`)**:
+    - Command-line utility built on `System.CommandLine`.
+    - Executes `index`, `query`, `status`, `parsers`, `watch`, `clean`, and `prune` commands. Delegated `serve` launches `CodeGraphMcp.Server`.CommandLine`.
    - Executes `index`, `query`, `status`, `watch`, `clean`, and `prune` commands. Delegated `serve` launches `CodeGraphMcp.Server`.
 
 ---
@@ -220,3 +237,77 @@ When editing files in an IDE, AI agents query the MCP server. `CodeGraphMcp` rea
   # Uninstall relay daemon
   .\scripts\relay\Uninstall-RelayService.ps1
   ```
+
+---
+
+## 6. Building & Dropping In a Custom Language Parser Plugin
+
+To add support for a new programming language (e.g. Rust, Go, Python, SQL) as an independent drop-in plugin:
+
+### Step 1: Create the Parser Project
+Create a class library under `src/Parsers/CodeGraphMcp.Parsers.<Language>/`:
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CodeGraphMcp.Core\CodeGraphMcp.Core.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>
+```
+
+### Step 2: Implement `ILanguageParser`
+```csharp
+using CodeGraphMcp.Models;
+using CodeGraphMcp.Parser;
+
+namespace CodeGraphMcp.Parsers.Rust;
+
+public sealed class RustParser : ILanguageParser
+{
+    public string Language => "rust";
+    public IReadOnlyList<string> FileExtensions { get; } = [".rs"];
+
+    public ParserMetadata Metadata { get; } = new(
+        Id: "rust",
+        Language: "rust",
+        FileExtensions: [".rs"],
+        Version: "1.0.0",
+        Description: "Rust language AST symbol parser",
+        Author: "Community Contributor"
+    );
+
+    public bool CanParse(string filePath) =>
+        filePath.EndsWith(".rs", StringComparison.OrdinalIgnoreCase);
+
+    public ParseResult Parse(string filePath, string sourceCode)
+    {
+        var symbols = new List<Symbol>();
+        var references = new List<SymbolReference>();
+
+        // Parse AST (e.g. TreeSitter, Roslyn, custom grammar)...
+
+        return new ParseResult(symbols, references);
+    }
+}
+```
+
+### Step 3: Drop into `Parsers/` Directory
+Copy the compiled DLL and its dependencies into any of the search locations:
+- **Application**: `<AppRoot>/Parsers/Rust/CodeGraphMcp.Parsers.Rust.dll`
+- **User**: `%LOCALAPPDATA%/CodeGraphMcp/Parsers/Rust/CodeGraphMcp.Parsers.Rust.dll`
+- **Environment**: `$env:CODEGRAPH_PARSERS_DIR/Rust/CodeGraphMcp.Parsers.Rust.dll`
+
+### Step 4: Verify with CLI
+```powershell
+.\publish\cli\CodeGraphMcp.Cli.exe parsers list
+.\publish\cli\CodeGraphMcp.Cli.exe parsers info rust
+```
+The parser is immediately available for indexing across both the CLI utility and the background MCP Server daemon!
+

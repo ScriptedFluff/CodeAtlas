@@ -3,6 +3,7 @@ using CodeGraphMcp.Config;
 using CodeGraphMcp.Db;
 using CodeGraphMcp.Git;
 using CodeGraphMcp.Indexer;
+using CodeGraphMcp.Models;
 using CodeGraphMcp.Parser;
 
 namespace CodeGraphMcp.Commands;
@@ -33,9 +34,11 @@ public static class CommandFactory
 
             Console.WriteLine($"Database:         {dbPath}");
 
+            var registry = ParserRegistry.CreateDefault();
+
             if (force || !GitHelpers.IsGitRepo(normRepo))
             {
-                var orchestrator = new IndexOrchestrator(db);
+                var orchestrator = new IndexOrchestrator(db, registry);
                 var result = await orchestrator.IndexAsync(normRepo, noIgnore, verbose);
                 var headHash = GitHelpers.GetHeadCommitHash(normRepo) ?? "unknown";
                 var branch = GitHelpers.GetCurrentBranch(normRepo) ?? "unknown";
@@ -45,8 +48,7 @@ public static class CommandFactory
             }
             else
             {
-                var parsers = GetParsers();
-                var delta   = new DeltaEngine(normRepo, db, parsers);
+                var delta   = new DeltaEngine(normRepo, db, registry);
                 var result  = await delta.RunAsync(noIgnore, verbose);
 
                 var seedCommitInfo = result.SeedCommitHash is { Length: >= 7 } h ? $" (commit {h[..7]})" : "";
@@ -70,7 +72,7 @@ public static class CommandFactory
         var referencedOption = new Option<bool>(new[] { "--referenced", "--with-references" }, "Display incoming references/call sites for matched symbols");
         var typeOption       = new Option<string?>(new[] { "--type", "-t" }, "Filter by symbol type (e.g. Class, Method, Interface, Property, Enum, Function)");
         var languageOption   = new Option<string?>(new[] { "--language", "--lang" }, "Filter by programming language (e.g. csharp, typescript, html, json, yaml, css, powershell)");
-        var limitOption      = new Option<int>(new[] { "--limit" }, () => 500, "Maximum number of symbols to return");
+        var limitOption      = new Option<int>(new[] { "--limit" }, () => 0, "Maximum number of symbols to return (0 or negative for all matches)");
         var skipOption       = new Option<int>(new[] { "--skip", "--offset" }, () => 0, "Number of symbols to skip for pagination");
         var queryCommand     = new Command("query", "Query the knowledge graph for a symbol");
         queryCommand.AddArgument(symbolArgument);
@@ -104,25 +106,31 @@ public static class CommandFactory
 
             using var db = new CodeGraphDb(dbPath, readOnly: true);
 
+            var normLang = LanguageNormalizer.Normalize(langOpt);
+            var parsedType = Enum.TryParse<SymbolType>(typeOpt, true, out var st) ? st : (SymbolType?)null;
+
             var parsers = GetParsers();
             var buffer  = new DirtyFileBuffer(repoRoot, parsers);
             buffer.Refresh();
 
-            var normLang     = LanguageNormalizer.Normalize(langOpt);
             var dirtyResults = buffer.FindByName(symbol, normLang);
             if (dirtyResults is not null && dirtyResults.Count > 0)
             {
                 var filteredDirty = dirtyResults
-                    .Where(s => typeOpt is null || s.SymbolType.ToString().Equals(typeOpt, StringComparison.OrdinalIgnoreCase))
+                    .Where(s => parsedType is null || s.SymbolType == parsedType.Value)
                     .Where(s => normLang is null || (s.Language ?? "").Equals(normLang, StringComparison.OrdinalIgnoreCase))
-                    .Skip(Math.Max(0, skipVal))
-                    .Take(limitVal <= 0 ? 500 : limitVal)
-                    .ToList();
+                    .Skip(Math.Max(0, skipVal));
 
-                if (filteredDirty.Count > 0)
+                if (limitVal > 0)
+                {
+                    filteredDirty = filteredDirty.Take(limitVal);
+                }
+
+                var dirtyList = filteredDirty.ToList();
+                if (dirtyList.Count > 0)
                 {
                     Console.WriteLine($"[LIVE - uncommitted]");
-                    foreach (var sym in filteredDirty)
+                    foreach (var sym in dirtyList)
                     {
                         Console.WriteLine($"  [{sym.SymbolType}] {sym.SymbolName} ({sym.Language}) | {sym.FilePath}:{sym.StartLine}-{sym.EndLine}");
                         if (withReferences)
@@ -134,12 +142,12 @@ public static class CommandFactory
                 }
             }
 
-            var fetchMax = Math.Max(skipVal + limitVal, 500);
-            var results = db.Symbols.FindByName(symbol, fetchMax, Math.Max(0, skipVal))
-                .Where(s => typeOpt is null || s.SymbolType.ToString().Equals(typeOpt, StringComparison.OrdinalIgnoreCase))
-                .Where(s => normLang is null || (s.Language ?? "").Equals(normLang, StringComparison.OrdinalIgnoreCase))
-                .Take(limitVal <= 0 ? 500 : limitVal)
-                .ToList();
+            var results = db.Symbols.FindByName(
+                symbol,
+                limit: limitVal,
+                offset: skipVal,
+                language: normLang,
+                symbolType: parsedType);
 
             if (results.Count == 0)
             {
@@ -234,14 +242,27 @@ public static class CommandFactory
             var fileCount   = counts.Count;
             var symbolCount = counts.Values.Sum();
             var refCount    = db.References.Count();
-            var needsReindex = lastHash is null || (headHash != "unknown" && !string.Equals(headHash, lastHash, StringComparison.OrdinalIgnoreCase));
+
+            var activeParsers = ParserRegistry.CreateDefault().GetAllParsers();
+            var indexedParsers = db.IndexedParsers.GetIndexedParsers();
+            var indexedMap = indexedParsers.ToDictionary(p => p.ParserId, StringComparer.OrdinalIgnoreCase);
+
+            var unindexed = activeParsers.Where(p => !indexedMap.ContainsKey(p.Metadata.Id)).Select(p => p.Metadata.Id).ToList();
+            var needsReindex = lastHash is null ||
+                               (headHash != "unknown" && !string.Equals(headHash, lastHash, StringComparison.OrdinalIgnoreCase)) ||
+                               unindexed.Count > 0;
+
+            var indexedSummary = indexedParsers.Count > 0 
+                ? string.Join(", ", indexedParsers.Select(p => p.ParserId)) 
+                : (fileCount > 0 ? "legacy (upgrade on next index)" : "none");
 
             Console.WriteLine($"Repository:       {repo.FullName}");
             Console.WriteLine($"Database:         {dbPath}");
             Console.WriteLine($"Branch:           {branch}");
             Console.WriteLine($"HEAD:             {headHash}");
             Console.WriteLine($"Last Indexed:     {lastHash ?? "never"}");
-            Console.WriteLine($"Needs Re-index:   {(needsReindex ? "yes" : "no")}");
+            Console.WriteLine($"Needs Re-index:   {(needsReindex ? (unindexed.Count > 0 ? $"yes (new unindexed parsers: {string.Join(", ", unindexed)})" : "yes") : "no")}");
+            Console.WriteLine($"Indexed Parsers:  {indexedSummary}");
             Console.WriteLine($"Files Indexed:    {fileCount}");
             Console.WriteLine($"Symbols Indexed:  {symbolCount}");
             Console.WriteLine($"References:       {refCount}");
@@ -349,21 +370,13 @@ public static class CommandFactory
         rootCommand.AddCommand(cleanCommand);
         rootCommand.AddCommand(watchCommand);
         rootCommand.AddCommand(pruneCommand);
+        rootCommand.AddCommand(ParsersCommandHandler.CreateParsersCommand());
 
         return rootCommand;
     }
 
     private static IReadOnlyList<ILanguageParser> GetParsers() =>
-    [
-        new CSharpParser(),
-        new TypeScriptParser(),
-        new JavaScriptParser(),
-        new HtmlParser(),
-        new PowerShellParser(),
-        new JsonParser(),
-        new YamlParser(),
-        new CssParser()
-    ];
+        ParserRegistry.CreateDefault().GetAllParsers();
 
     private static string? FindGitRoot(string start)
     {

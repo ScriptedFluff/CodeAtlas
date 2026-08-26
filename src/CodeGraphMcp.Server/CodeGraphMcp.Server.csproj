@@ -9,17 +9,14 @@
     <Authors>Garry Flanagan</Authors>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
 
-    <!-- Native AOT -->
-    <PublishAot>true</PublishAot>
+    <!-- High-performance ReadyToRun deployment (supports dynamic ALC plugin loading) -->
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <SelfContained>false</SelfContained>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <StripSymbols>true</StripSymbols>
-
-    <!-- Trim analysis -->
-    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
   </PropertyGroup>
 
   <ItemGroup>
-    <TrimmerRootAssembly Include="CodeGraphMcp.Server" />
     <None Update="appsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
@@ -30,11 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="ModelContextProtocol" Version="2.1.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
-    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
-    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="ModelContextProtocol" Version="0.1.0-preview.10" />
   </ItemGroup>
 
 </Project>

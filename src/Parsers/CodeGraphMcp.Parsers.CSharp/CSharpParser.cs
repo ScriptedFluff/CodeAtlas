@@ -6,6 +6,7 @@ namespace CodeGraphMcp.Parser;
 
 public sealed class CSharpParser : ILanguageParser
 {
+    public ParserMetadata Metadata => new("csharp", "C# Parser", "1.0.0", "C# TreeSitter AST parser", "CodeGraphMcp");
     public IReadOnlyList<string> FileExtensions => [".cs"];
     public string Language => "csharp";
 
@@ -58,7 +59,6 @@ public sealed class CSharpParser : ILanguageParser
 
     public IEnumerable<SymbolReference> ParseReferences(string filePath, string source)
         => ParseFile(filePath, source).References;
-
 
     private static void WalkForReferences(Node node, string filePath, List<SymbolReference> refs, string? enclosingSymbol)
     {
@@ -162,7 +162,7 @@ public sealed class CSharpParser : ILanguageParser
             }
         }
         catch { }
-        return default(Node);
+        return default;
     }
 
     private static void TraverseNode(Node node, string filePath, List<Symbol> symbols, string? currentNamespace, string? currentClass)
@@ -207,7 +207,6 @@ public sealed class CSharpParser : ILanguageParser
                 });
             }
         }
-
         else if (type is "method_declaration" or "property_declaration")
         {
             var nameNode = GetNameNode(node);
@@ -229,7 +228,8 @@ public sealed class CSharpParser : ILanguageParser
                     StartByte  = (int)node.StartIndex,
                     EndByte    = (int)node.EndIndex,
                     Signature  = ExtractSignature(node, symbolType),
-                    DocComment = ExtractDocComment(node)
+                    DocComment = ExtractDocComment(node),
+                    IsPartial  = HasPartialModifier(node)
                 });
             }
         }
@@ -258,7 +258,7 @@ public sealed class CSharpParser : ILanguageParser
         }
         catch { }
 
-        return default(Node);
+        return default;
     }
 
     private static string? ExtractSignature(Node node, SymbolType type)

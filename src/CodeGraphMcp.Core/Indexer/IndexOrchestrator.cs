@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace CodeGraphMcp.Indexer;
 
-public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>? logger = null)
+public sealed class IndexOrchestrator
 {
     private static readonly HashSet<string> DefaultIgnoredDirs = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -18,26 +18,25 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
         "lib", "wwwroot/lib"
     };
 
-    private readonly Dictionary<string, ILanguageParser> _extensionMap = BuildExtensionMap();
+    private readonly CodeGraphDb db;
+    private readonly IParserRegistry _parserRegistry;
+    private readonly ILogger<IndexOrchestrator>? logger;
 
-    private static Dictionary<string, ILanguageParser> BuildExtensionMap()
+    public IndexOrchestrator(
+        CodeGraphDb db,
+        IParserRegistry? parserRegistry = null,
+        ILogger<IndexOrchestrator>? logger = null)
     {
-        IReadOnlyList<ILanguageParser> parsers =
-        [
-            new CSharpParser(),
-            new TypeScriptParser(),
-            new JavaScriptParser(),
-            new HtmlParser(),
-            new PowerShellParser(),
-            new JsonParser(),
-            new YamlParser(),
-            new CssParser(),
-        ];
-        var map = new Dictionary<string, ILanguageParser>(StringComparer.OrdinalIgnoreCase);
-        foreach (var p in parsers)
-            foreach (var ext in p.FileExtensions)
-                map[ext] = p;
-        return map;
+        this.db = db;
+        _parserRegistry = parserRegistry ?? ParserRegistry.CreateDefault();
+        this.logger = logger;
+    }
+
+    public IndexOrchestrator(
+        CodeGraphDb db,
+        ILogger<IndexOrchestrator>? logger)
+        : this(db, null, logger)
+    {
     }
 
     public Task<IndexResult> IndexAsync(string repoPath, CancellationToken ct)
@@ -130,7 +129,8 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
         }, async (filePath, token) =>
         {
             var ext = Path.GetExtension(filePath);
-            if (!_extensionMap.TryGetValue(ext, out var parser)) return;
+            var parser = _parserRegistry.GetParserForExtension(ext);
+            if (parser == null) return;
 
             try
             {
@@ -189,6 +189,10 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
             }
         }
 
+        lock (db)
+        {
+            db.IndexedParsers.RecordAllIndexedParsers(_parserRegistry.GetAllParsers());
+        }
 
         sw.Stop();
         logger?.LogInformation("Indexed {Symbols} symbols in {Ms}ms", symbolsWritten, sw.ElapsedMilliseconds);
@@ -223,7 +227,7 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
     }
 
 
-    private IEnumerable<string> EnumerateFiles(string root, bool noIgnore = false)
+    internal IEnumerable<string> EnumerateFiles(string root, bool noIgnore = false)
     {
         var config = CodeGraphMcp.Config.AppConfig.Load(root);
         var ignoredDirs = new HashSet<string>(config.IgnoreDirectories, StringComparer.OrdinalIgnoreCase);
@@ -332,7 +336,7 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
                     continue;
 
                 var ext = Path.GetExtension(file);
-                if (_extensionMap.ContainsKey(ext) && (noIgnore || !matcher.IsIgnored(file, isDirectory: false)))
+                if (_parserRegistry.GetParserForExtension(ext) != null && (noIgnore || !matcher.IsIgnored(file, isDirectory: false)))
                     yield return file;
             }
         }

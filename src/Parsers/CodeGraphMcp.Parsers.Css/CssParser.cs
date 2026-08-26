@@ -5,6 +5,7 @@ namespace CodeGraphMcp.Parser;
 
 public sealed partial class CssParser : ILanguageParser
 {
+    public ParserMetadata Metadata => new("css", "CSS Parser", "1.0.0", "CSS, SCSS, and LESS stylesheet parser", "CodeGraphMcp");
     public IReadOnlyList<string> FileExtensions => [".css", ".scss", ".less"];
     public string Language => "css";
 

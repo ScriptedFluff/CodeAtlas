@@ -6,38 +6,36 @@ This guide details how to configure and integrate `CodeGraphMcp` as a Model Cont
 
 ## 1. Prerequisites & Setup
 
-Before configuring your AI client, publish the release binaries for `CodeGraphMcp`:
+Before configuring your AI client, publish the release binaries and modular parser plugins for `CodeGraphMcp`:
 
 ```powershell
-# Publish MCP Server daemon binary to ./publish/server
-dotnet publish src/CodeGraphMcp.Server/CodeGraphMcp.Server.csproj -c Release -o ./publish/server
-
-# Publish CLI binary to ./publish/cli
-dotnet publish src/CodeGraphMcp.Cli/CodeGraphMcp.Cli.csproj -c Release -o ./publish/cli
+# Publish Server daemon, CLI utility, and all 8 drop-in parser plugins
+pwsh -File ./scripts/publish.ps1
 ```
 
-The compiled executables will be located at:
-- Server: `D:\Projects\C#\CodeGraphMcp\publish\server\CodeGraphMcp.Server.exe`
-- CLI: `D:\Projects\C#\CodeGraphMcp\publish\cli\CodeGraphMcp.Cli.exe`
+The compiled executables and plugins will be located at:
+- Server Daemon: `D:\Projects\C#\CodeGraphMcp\publish\server\CodeGraphMcp.Server.exe`
+- CLI Utility: `D:\Projects\C#\CodeGraphMcp\publish\cli\CodeGraphMcp.Cli.exe`
+- Drop-in Plugins: `D:\Projects\C#\CodeGraphMcp\publish\server\Parsers\`
 
 ---
 
 ## 2. Server Execution Modes
 
-`CodeGraphMcp.Server` runs as a high-performance MCP stdio server:
+`CodeGraphMcp.Server` runs as a high-performance MCP stdio server with full dynamic drop-in parser support:
 
 ### Mode A: Dynamic / Unbound Mode (Recommended)
 In this mode, no target repository is hardcoded at server launch. The server will resolve repository paths dynamically when tools are invoked, using either an explicit `targetDirectory` argument or defaulting to the client's current active workspace directory.
 
 ```powershell
-CodeGraphMcp.Server.exe
+.\publish\server\CodeGraphMcp.Server.exe
 ```
 
 ### Mode B: Bound Repository Mode
 In this mode, the server is locked to a specific repository path. Every tool query automatically targets this index unless explicitly overridden.
 
 ```powershell
-CodeGraphMcp.Server.exe -r "C:\Projects\MyRepo"
+.\publish\server\CodeGraphMcp.Server.exe -r "C:\Projects\MyRepo"
 ```
 
 ---
@@ -52,7 +50,7 @@ Add the following entry to your `mcp_config.json`:
 {
   "mcpServers": {
     "codegraph": {
-      "command": "C:\\Projects\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
       "args": []
     }
   }
@@ -65,9 +63,8 @@ If targeting a fixed repository:
 {
   "mcpServers": {
     "codegraph": {
-      "command": "C:\\Projects\\CodeGraphMcp\\publish\\CodeGraphMcp.exe",
+      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
       "args": [
-        "serve",
         "-r",
         "C:\\Projects\\TargetApp"
       ]
@@ -84,10 +81,8 @@ If targeting a fixed repository:
 {
   "mcpServers": {
     "codegraph": {
-      "command": "C:\\Projects\\CodeGraphMcp\\publish\\CodeGraphMcp.exe",
-      "args": [
-        "serve"
-      ]
+      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+      "args": []
     }
   }
 }
@@ -99,7 +94,7 @@ If targeting a fixed repository:
 
 **Name:** `codegraph`  
 **Type:** `command`  
-**Command:** `C:\Projects\CodeGraphMcp\publish\CodeGraphMcp.exe serve`
+**Command:** `D:\Projects\C#\CodeGraphMcp\publish\server\CodeGraphMcp.Server.exe`
 
 Or in `.cursor/mcp.json`:
 
@@ -107,8 +102,8 @@ Or in `.cursor/mcp.json`:
 {
   "mcpServers": {
     "codegraph": {
-      "command": "C:\\Projects\\CodeGraphMcp\\publish\\CodeGraphMcp.exe",
-      "args": ["serve"]
+      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+      "args": []
     }
   }
 }
@@ -124,8 +119,8 @@ In your MCP settings (`cline_mcp_settings.json`):
 {
   "mcpServers": {
     "codegraph": {
-      "command": "C:\\Projects\\CodeGraphMcp\\publish\\CodeGraphMcp.exe",
-      "args": ["serve"],
+      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+      "args": [],
       "disabled": false,
       "autoApprove": []
     }

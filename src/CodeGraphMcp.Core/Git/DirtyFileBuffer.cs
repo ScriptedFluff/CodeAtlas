@@ -8,8 +8,22 @@ namespace CodeGraphMcp.Git;
 /// Results overlay the SQLite DB — dirty symbols take precedence.
 /// Thread-safe for concurrent read access; refresh is single-threaded.
 /// </summary>
-public sealed class DirtyFileBuffer(string repoPath, IReadOnlyList<ILanguageParser> parsers)
+public sealed class DirtyFileBuffer
 {
+    private readonly string repoPath;
+    private readonly IParserRegistry _parserRegistry;
+
+    public DirtyFileBuffer(string repoPath, IParserRegistry parserRegistry)
+    {
+        this.repoPath = repoPath;
+        _parserRegistry = parserRegistry;
+    }
+
+    public DirtyFileBuffer(string repoPath, IReadOnlyList<ILanguageParser> parsers)
+        : this(repoPath, new ParserRegistry(parsers))
+    {
+    }
+
     private static readonly HashSet<string> IgnoredDirs = new(StringComparer.OrdinalIgnoreCase)
     {
         ".git", ".codegraph", "bin", "obj", "publish",
@@ -21,7 +35,6 @@ public sealed class DirtyFileBuffer(string repoPath, IReadOnlyList<ILanguagePars
     private volatile IReadOnlyDictionary<string, IReadOnlyList<Symbol>> _cache
         = new Dictionary<string, IReadOnlyList<Symbol>>();
 
-    private readonly Dictionary<string, ILanguageParser> _extensionMap = BuildMap(parsers);
     private readonly object _refreshLock = new();
 
     /// <summary>
@@ -41,7 +54,8 @@ public sealed class DirtyFileBuffer(string repoPath, IReadOnlyList<ILanguagePars
                 if (IsIgnoredPath(relPath)) continue;
 
                 var ext = Path.GetExtension(relPath);
-                if (!_extensionMap.TryGetValue(ext, out var parser)) continue;
+                var parser = _parserRegistry.GetParserForExtension(ext);
+                if (parser == null) continue;
 
                 var fullPath = Path.Combine(repoPath, relPath);
                 if (!File.Exists(fullPath)) continue;
@@ -75,7 +89,8 @@ public sealed class DirtyFileBuffer(string repoPath, IReadOnlyList<ILanguagePars
             if (IsIgnoredPath(normPath)) return;
 
             var ext = Path.GetExtension(normPath);
-            if (!_extensionMap.TryGetValue(ext, out var parser)) return;
+            var parser = _parserRegistry.GetParserForExtension(ext);
+            if (parser == null) return;
 
             var fullPath = Path.Combine(repoPath, relFilePath);
             var newCache = new Dictionary<string, IReadOnlyList<Symbol>>(_cache, StringComparer.OrdinalIgnoreCase);
@@ -160,13 +175,4 @@ public sealed class DirtyFileBuffer(string repoPath, IReadOnlyList<ILanguagePars
     /// </summary>
     public IEnumerable<Symbol> GetAllDirtySymbols() =>
         _cache.Values.SelectMany(s => s);
-
-    private static Dictionary<string, ILanguageParser> BuildMap(IReadOnlyList<ILanguageParser> parsers)
-    {
-        var map = new Dictionary<string, ILanguageParser>(StringComparer.OrdinalIgnoreCase);
-        foreach (var p in parsers)
-            foreach (var ext in p.FileExtensions)
-                map[ext] = p;
-        return map;
-    }
 }

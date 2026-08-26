@@ -6,6 +6,7 @@ namespace CodeGraphMcp.Parser;
 
 public sealed class JavaScriptParser : JsTsParserBase, ILanguageParser
 {
+    public ParserMetadata Metadata => new("javascript", "JavaScript Parser", "1.0.0", "JavaScript and JSX TreeSitter parser", "CodeGraphMcp");
     public IReadOnlyList<string> FileExtensions => [".js", ".jsx", ".mjs", ".cjs"];
     public string Language => "javascript";
 
@@ -140,8 +141,6 @@ public sealed class JavaScriptParser : JsTsParserBase, ILanguageParser
             TraverseNode(child, filePath, symbols, nextClass);
         }
     }
-
-
 
     private static void WalkForReferences(Node node, string filePath, List<SymbolReference> refs, string? enclosingSymbol)
     {

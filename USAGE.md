@@ -7,37 +7,41 @@
 
 ## 1. Quick Start
 
-### Building the Project
+### Building and Publishing the Project
 ```powershell
 # Build debug version
 dotnet build
 
-# Publish MCP Server daemon binary to ./publish/server
-dotnet publish src/CodeGraphMcp.Server/CodeGraphMcp.Server.csproj -c Release -o ./publish/server
-
-# Publish CLI binary to ./publish/cli
-dotnet publish src/CodeGraphMcp.Cli/CodeGraphMcp.Cli.csproj -c Release -o ./publish/cli
+# Full release publish (Server daemon, CLI utility, and all drop-in parser plugins)
+pwsh -File ./scripts/publish.ps1
 ```
+
+The published executables and plugins will be located at:
+- MCP Daemon Server: `.\publish\server\CodeGraphMcp.Server.exe`
+- CLI Utility: `.\publish\cli\CodeGraphMcp.Cli.exe`
+- Drop-in Plugins: `.\publish\server\Parsers\` and `.\publish\cli\Parsers\`
 
 ---
 
 ## 2. CLI Commands Overview
 
-The executable supports six primary commands: `index`, `query`, `status`, `watch`, `clean`, and `serve`.
+`CodeGraphMcp.Cli` (`cg`) supports the following commands:
 
-```
+```text
 CodeGraphMcp — local code knowledge graph engine
 
 Usage:
   CodeGraphMcp [command] [options]
 
 Commands:
-  index <repo-path>  Parse and index a repository into the knowledge graph
-  query <symbol-name> Query the knowledge graph for a symbol
-  status <repo-path> Show the current index state for a repository
-  watch <repo-path>  Continuously re-index on git changes
-  clean <repo-path>  Delete the index database for a repository
-  serve              Start the MCP stdio server
+  index <repo-path>    Parse and index a repository into the knowledge graph
+  query <symbol-name>  Query the knowledge graph for a symbol
+  status <repo-path>   Show the current index state for a repository
+  parsers              Manage modular drop-in language parser plugins
+  watch <repo-path>    Continuously re-index on git changes
+  clean <repo-path>    Delete the index database for a repository
+  prune                Remove stale index databases for non-existent repositories or worktrees
+  serve <repo-path>    Start the MCP stdio server
 ```
 
 ---
@@ -169,20 +173,61 @@ dotnet run --project src/CodeGraphMcp.Cli -- clean "C:\path\to\your\repository" 
 
 ---
 
-## 8. Supported Languages & Files
+## 8. Managing Drop-in Parser Plugins (`parsers`)
 
-`CodeGraphMcp` includes custom AST parsers for:
-- **C#**: `.cs` (Classes, Interfaces, Structs, Enums, Methods, Properties, Record definitions)
-- **TypeScript / JavaScript**: `.ts`, `.tsx`, `.js`, `.jsx` (Functions, Classes, Interfaces, Exports)
-- **HTML**: `.html`, `.htm` (IDs, Elements, Form Controls)
-- **PowerShell**: `.ps1`, `.psm1` (Functions, Scripts)
-- **JSON / Manifests**: `.json`, `package.json`, `appsettings.json` (Keys, Objects, Dependencies)
-- **YAML / Pipelines**: `.yaml`, `.yml` (Keys, Jobs, Pipeline Configurations)
-- **CSS / Styles**: `.css` (Rule Sets, Selectors, Classes)
+`CodeGraphMcp` features a decoupled plugin architecture where each language parser is an independent DLL loaded into an isolated, collectible `AssemblyLoadContext`.
+
+### Subcommands
+
+```powershell
+# 1. List all installed parsers with status, tier, extensions, and versions
+.\publish\cli\CodeGraphMcp.Cli.exe parsers list
+
+# Output in JSON format (AOT-safe)
+.\publish\cli\CodeGraphMcp.Cli.exe parsers list --json
+
+# Verbose mode with multi-tier search directories and diagnostics
+.\publish\cli\CodeGraphMcp.Cli.exe parsers list --verbose
+
+# 2. Disable a parser (moves folder to DisabledParsers/)
+.\publish\cli\CodeGraphMcp.Cli.exe parsers disable json
+
+# 3. Enable a previously disabled parser (moves folder back to Parsers/)
+.\publish\cli\CodeGraphMcp.Cli.exe parsers enable json
+
+# 4. View detailed metadata for a specific parser
+.\publish\cli\CodeGraphMcp.Cli.exe parsers info csharp
+.\publish\cli\CodeGraphMcp.Cli.exe parsers info csharp --json
+```
+
+### Multi-Tier Directory Layout
+- **Environment Tier**: `CODEGRAPH_PARSERS_DIR` or `CODEGRAPH_PARSERS_PATH`
+- **User Tier**: `%LOCALAPPDATA%\CodeGraphMcp\Parsers` (and `DisabledParsers`)
+- **Application Tier**: `{AppBaseDirectory}\Parsers` (and `DisabledParsers`)
+
+### Status Indicators
+- `ACTIVE`: Parser is enabled and actively parsing source files.
+- `ACTIVE_OVERRIDE`: Custom user or environment parser successfully overriding an application-tier default under `AllowAll` or `AllowList` policy.
+- `BLOCKED_SHADOWING`: Custom parser blocked from overriding an application-tier default under `Strict` policy.
+- `DISABLED`: Parser is located in a `DisabledParsers/` directory and skipped during indexing.
+- `FAILED`: Assembly failed to load (e.g. missing dependency or invalid format).
 
 ---
 
-## 9. MCP Server Mode (`serve`)
+## 9. Supported Languages & Files
+
+`CodeGraphMcp` includes 8 modular AST parser plugins out of the box:
+- **C#**: `.cs` (Classes, Interfaces, Structs, Enums, Methods, Properties, Record definitions, Attributes)
+- **TypeScript / JavaScript**: `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs` (Functions, Classes, Interfaces, Enums, Types, Exports)
+- **HTML / XML**: `.html`, `.htm`, `.cshtml`, `.razor`, `.xml`, `.csproj`, `.config`, `.vcxproj`, `.props` (Tags, IDs, Elements, Form Controls)
+- **PowerShell**: `.ps1`, `.psm1`, `.psd1` (Functions, Parameters, Scripts)
+- **JSON / Manifests**: `.json`, `package.json`, `appsettings.json` (Keys, Objects, Dependencies)
+- **YAML / Pipelines**: `.yaml`, `.yml` (Keys, Jobs, Pipeline Configurations)
+- **CSS / Styles**: `.css`, `.scss`, `.less` (Rule Sets, Selectors, Classes)
+
+---
+
+## 10. MCP Server Mode (`serve`)
 
 Starts the Model Context Protocol (MCP) server over standard input/output (stdio JSON-RPC). This allows AI coding assistants (such as Claude Desktop, AGY, VSCode, Cursor) to interactively query the local code knowledge graph.
 
@@ -265,7 +310,7 @@ Scans the global index storage cache for database files whose repository roots o
 {
   "mcpServers": {
     "codegraph": {
-      "command": "C:\\path\\to\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
       "args": []
     }
   }
@@ -274,7 +319,7 @@ Scans the global index storage cache for database files whose repository roots o
 
 ---
 
-## 10. Storage & Configuration Details
+## 11. Storage & Configuration Details
 
 - **Default Database Path**: `<repo-root>/.codegraph/code_graph.db` (unless `--db-dir` override is specified).
 - **Database Engine**: SQLite (managed via `Microsoft.Data.Sqlite` and `Dapper`).
@@ -317,7 +362,7 @@ Scans the global index storage cache for database files whose repository roots o
 
 ---
 
-## 11. Local Inter-Agent Relay Service
+## 12. Local Inter-Agent Relay Service
 
 For seamless communication between **AGY (Antigravity)** and **GitHub Copilot** without triggering repetitive IDE workspace file access security prompts, use the PowerShell relay service located in `scripts/relay/`.
 

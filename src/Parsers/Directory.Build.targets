@@ -1,0 +1,26 @@
+<Project>
+  <Target Name="CopyToDevParsersFolder" AfterTargets="Build">
+    <PropertyGroup>
+      <ParserFolderTargetName>$(MSBuildProjectName.Replace('CodeGraphMcp.Parsers.', ''))</ParserFolderTargetName>
+      <TargetParserDirCli>$(SolutionDir)src\CodeGraphMcp.Cli\bin\$(Configuration)\net10.0\Parsers\$(ParserFolderTargetName)\</TargetParserDirCli>
+      <TargetParserDirServer>$(SolutionDir)src\CodeGraphMcp.Server\bin\$(Configuration)\net10.0\Parsers\$(ParserFolderTargetName)\</TargetParserDirServer>
+      <TargetParserDirTests>$(SolutionDir)tests\CodeGraphMcp.Tests\bin\$(Configuration)\net10.0\Parsers\$(ParserFolderTargetName)\</TargetParserDirTests>
+    </PropertyGroup>
+    <ItemGroup>
+      <ParserOutputFiles Include="$(TargetDir)*.*" />
+      <ParserOutputFiles Include="$(TargetDir)runtimes\win-x64\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ParserOutputFiles)"
+          DestinationFiles="@(ParserOutputFiles->'$(TargetParserDirCli)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(SolutionDir)src\CodeGraphMcp.Cli')" />
+    <Copy SourceFiles="@(ParserOutputFiles)"
+          DestinationFiles="@(ParserOutputFiles->'$(TargetParserDirServer)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(SolutionDir)src\CodeGraphMcp.Server')" />
+    <Copy SourceFiles="@(ParserOutputFiles)"
+          DestinationFiles="@(ParserOutputFiles->'$(TargetParserDirTests)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(SolutionDir)tests\CodeGraphMcp.Tests')" />
+  </Target>
+</Project>

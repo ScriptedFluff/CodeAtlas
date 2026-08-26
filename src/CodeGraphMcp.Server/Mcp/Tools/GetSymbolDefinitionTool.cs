@@ -7,6 +7,13 @@ using ModelContextProtocol.Server;
 
 namespace CodeGraphMcp.Mcp.Tools;
 
+public sealed record SymbolLocationEntry(
+    string FilePath,
+    int StartLine,
+    int EndLine,
+    string? Signature,
+    string? SourceCode);
+
 public sealed record SymbolDefinitionResult(
     string SymbolName,
     string SymbolType,
@@ -17,7 +24,9 @@ public sealed record SymbolDefinitionResult(
     string? DocComment,
     string? SourceCode,
     bool IsLive,
-    IReadOnlyList<CallerEntry>? References = null);
+    IReadOnlyList<CallerEntry>? References = null,
+    bool IsPartial = false,
+    IReadOnlyList<SymbolLocationEntry>? Locations = null);
 
 [McpServerToolType]
 public sealed class GetSymbolDefinitionTool(
@@ -61,6 +70,23 @@ public sealed class GetSymbolDefinitionTool(
                 if (hit is not null)
                 {
                     var callers = withReferences ? db.References.FindCallers(hit.SymbolName) : null;
+                    List<SymbolLocationEntry>? locations = null;
+                    var matchingHits = dirtyHits
+                        .Where(s => s.SymbolName.Equals(hit.SymbolName, StringComparison.OrdinalIgnoreCase) &&
+                                    s.SymbolType == hit.SymbolType)
+                        .ToList();
+
+                    if (matchingHits.Count > 1 || hit.IsPartial)
+                    {
+                        locations = matchingHits.Select(loc => new SymbolLocationEntry(
+                            loc.FilePath,
+                            loc.StartLine,
+                            loc.EndLine,
+                            loc.Signature,
+                            ReadSourceRange(context.WorkspaceRoot, loc)
+                        )).ToList();
+                    }
+
                     return new SymbolDefinitionResult(
                         hit.SymbolName,
                         hit.SymbolType.ToString(),
@@ -71,7 +97,9 @@ public sealed class GetSymbolDefinitionTool(
                         hit.DocComment,
                         ReadSourceRange(context.WorkspaceRoot, hit),
                         IsLive: true,
-                        References: callers);
+                        References: callers,
+                        IsPartial: hit.IsPartial || (matchingHits.Count > 1),
+                        Locations: locations);
                 }
             }
         }
@@ -88,6 +116,24 @@ public sealed class GetSymbolDefinitionTool(
         if (match is null) return null;
 
         var dbCallers = withReferences ? db.References.FindCallers(match.SymbolName) : null;
+
+        List<SymbolLocationEntry>? dbLocations = null;
+        var partialHits = results
+            .Where(s => s.SymbolName.Equals(match.SymbolName, StringComparison.OrdinalIgnoreCase) &&
+                        s.SymbolType == match.SymbolType)
+            .ToList();
+
+        if (partialHits.Count > 1 || match.IsPartial)
+        {
+            dbLocations = partialHits.Select(loc => new SymbolLocationEntry(
+                loc.FilePath,
+                loc.StartLine,
+                loc.EndLine,
+                loc.Signature,
+                ReadSourceRange(context.WorkspaceRoot, loc)
+            )).ToList();
+        }
+
         return new SymbolDefinitionResult(
             match.SymbolName,
             match.SymbolType.ToString(),
@@ -98,7 +144,9 @@ public sealed class GetSymbolDefinitionTool(
             match.DocComment,
             ReadSourceRange(context.WorkspaceRoot, match),
             IsLive: false,
-            References: dbCallers);
+            References: dbCallers,
+            IsPartial: match.IsPartial || (partialHits.Count > 1),
+            Locations: dbLocations);
     }
 
     private static string? ReadSourceRange(string workspaceRoot, Symbol sym)
