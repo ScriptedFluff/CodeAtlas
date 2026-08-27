@@ -6,6 +6,7 @@ using Xunit;
 
 namespace CodeGraphMcp.Tests;
 
+[Collection("Sequential")]
 public class CliTests : IDisposable
 {
     private readonly string _tempRepoDir;
@@ -187,6 +188,35 @@ public class CliTests : IDisposable
         finally
         {
             Console.SetOut(currentOut);
+        }
+    }
+
+    [Fact]
+    public async Task RootCommand_InvokeSyncFile_UpsertsAndDeletesSuccessfully()
+    {
+        var testFile = Path.Combine(_tempRepoDir, "CliTestClass.cs");
+        await File.WriteAllTextAsync(testFile, "public class CliTestClass { public void Run() {} }");
+
+        var root = CommandFactory.CreateRootCommand();
+
+        // 1. Upsert
+        var exitCodeUpsert = await root.InvokeAsync(new[] { "sync-file", "CliTestClass.cs", "-r", _tempRepoDir });
+        Assert.Equal(0, exitCodeUpsert);
+
+        using (var db = new CodeGraphDb(_dbPath, readOnly: true))
+        {
+            var syms = db.Symbols.FindByName("CliTestClass");
+            Assert.Single(syms);
+        }
+
+        // 2. Delete
+        var exitCodeDelete = await root.InvokeAsync(new[] { "sync-file", "CliTestClass.cs", "-r", _tempRepoDir, "--delete" });
+        Assert.Equal(0, exitCodeDelete);
+
+        using (var db = new CodeGraphDb(_dbPath, readOnly: true))
+        {
+            var syms = db.Symbols.FindByName("CliTestClass");
+            Assert.Empty(syms);
         }
     }
 }

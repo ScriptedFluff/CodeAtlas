@@ -67,102 +67,8 @@ public static class CommandFactory
 
 
         // ── query ──────────────────────────────────────────────────────────────────
-        var symbolArgument   = new Argument<string>("symbol-name", "Name of the symbol to look up");
-        var repoOption       = new Option<DirectoryInfo?>(new[] { "--repo", "-r" }, "Repository path to query (defaults to current working directory)");
-        var referencedOption = new Option<bool>(new[] { "--referenced", "--with-references" }, "Display incoming references/call sites for matched symbols");
-        var typeOption       = new Option<string?>(new[] { "--type", "-t" }, "Filter by symbol type (e.g. Class, Method, Interface, Property, Enum, Function)");
-        var languageOption   = new Option<string?>(new[] { "--language", "--lang" }, "Filter by programming language (e.g. csharp, typescript, html, json, yaml, css, powershell)");
-        var limitOption      = new Option<int>(new[] { "--limit" }, () => 0, "Maximum number of symbols to return (0 or negative for all matches)");
-        var skipOption       = new Option<int>(new[] { "--skip", "--offset" }, () => 0, "Number of symbols to skip for pagination");
-        var queryCommand     = new Command("query", "Query the knowledge graph for a symbol");
-        queryCommand.AddArgument(symbolArgument);
-        queryCommand.AddOption(repoOption);
-        queryCommand.AddOption(typeOption);
-        queryCommand.AddOption(languageOption);
-        queryCommand.AddOption(limitOption);
-        queryCommand.AddOption(skipOption);
-        queryCommand.AddOption(dbDirOption);
-        queryCommand.AddOption(referencedOption);
-        queryCommand.SetHandler((context) =>
-        {
-            var symbol         = context.ParseResult.GetValueForArgument(symbolArgument);
-            var repoOpt        = context.ParseResult.GetValueForOption(repoOption);
-            var typeOpt        = context.ParseResult.GetValueForOption(typeOption);
-            var langOpt        = context.ParseResult.GetValueForOption(languageOption);
-            var limitVal       = context.ParseResult.GetValueForOption(limitOption);
-            var skipVal        = context.ParseResult.GetValueForOption(skipOption);
-            var dbDir          = context.ParseResult.GetValueForOption(dbDirOption);
-            var withReferences = context.ParseResult.GetValueForOption(referencedOption);
+        var queryCommand = QueryCommandHandler.CreateQueryCommand();
 
-            var startDir = repoOpt?.FullName ?? Directory.GetCurrentDirectory();
-            var repoRoot = repoOpt is not null ? startDir : (FindGitRoot(startDir) ?? startDir);
-            var dbPath   = StorageConfig.ResolveDbPath(dbDir?.FullName, repoRoot);
-
-            if (!File.Exists(dbPath))
-            {
-                Console.WriteLine($"No index database found at '{dbPath}'. Please run 'index <repo-path>' first.");
-                return;
-            }
-
-            using var db = new CodeGraphDb(dbPath, readOnly: true);
-
-            var normLang = LanguageNormalizer.Normalize(langOpt);
-            var parsedType = Enum.TryParse<SymbolType>(typeOpt, true, out var st) ? st : (SymbolType?)null;
-
-            var parsers = GetParsers();
-            var buffer  = new DirtyFileBuffer(repoRoot, parsers);
-            buffer.Refresh();
-
-            var dirtyResults = buffer.FindByName(symbol, normLang);
-            if (dirtyResults is not null && dirtyResults.Count > 0)
-            {
-                var filteredDirty = dirtyResults
-                    .Where(s => parsedType is null || s.SymbolType == parsedType.Value)
-                    .Where(s => normLang is null || (s.Language ?? "").Equals(normLang, StringComparison.OrdinalIgnoreCase))
-                    .Skip(Math.Max(0, skipVal));
-
-                if (limitVal > 0)
-                {
-                    filteredDirty = filteredDirty.Take(limitVal);
-                }
-
-                var dirtyList = filteredDirty.ToList();
-                if (dirtyList.Count > 0)
-                {
-                    Console.WriteLine($"[LIVE - uncommitted]");
-                    foreach (var sym in dirtyList)
-                    {
-                        Console.WriteLine($"  [{sym.SymbolType}] {sym.SymbolName} ({sym.Language}) | {sym.FilePath}:{sym.StartLine}-{sym.EndLine}");
-                        if (withReferences)
-                        {
-                            PrintReferences(db, sym.SymbolName);
-                        }
-                    }
-                    return;
-                }
-            }
-
-            var results = db.Symbols.FindByName(
-                symbol,
-                limit: limitVal,
-                offset: skipVal,
-                language: normLang,
-                symbolType: parsedType);
-
-            if (results.Count == 0)
-            {
-                Console.WriteLine($"No symbols found matching '{symbol}'.");
-                return;
-            }
-            foreach (var sym in results)
-            {
-                Console.WriteLine($"[{sym.SymbolType}] {sym.SymbolName} ({sym.Language}) | {sym.FilePath}:{sym.StartLine}-{sym.EndLine}");
-                if (withReferences)
-                {
-                    PrintReferences(db, sym.SymbolName);
-                }
-            }
-        });
 
         // ── serve ──────────────────────────────────────────────────────────────────
         var serveRepoArg     = new Argument<DirectoryInfo?>("repo-path", () => null, "Repository path to serve (optional)");
@@ -361,6 +267,77 @@ public static class CommandFactory
             Console.WriteLine($"Pruned {res.PrunedDatabaseCount} stale database(s), freed {res.TotalBytesFreed:N0} bytes.");
         }, dbDirOption);
 
+        // ── sync / sync-file ────────────────────────────────────────────────────────
+        var pathArgument    = new Argument<string>("path-or-glob", "File path or glob pattern to sync or purge (e.g. 'src/MyFile.cs', 'src/Services/**/*.cs')");
+        var repoOption      = new Option<DirectoryInfo?>(new[] { "--repo", "-r" }, "Repository path (defaults to current working directory or git root)");
+        var deletePathOpt   = new Option<bool>(new[] { "--delete", "-d" }, "Purge matching files and their symbols/edges from the index");
+        var contentOpt      = new Option<string?>("--content", "In-memory file content to parse instead of reading from disk (single-file mode only)");
+        var syncNoIgnoreOpt = new Option<bool>("--no-ignore", "Disable .gitignore rule filtering during sync");
+        var syncVerboseOpt  = new Option<bool>(new[] { "--verbose", "-v" }, "Enable verbose progress and detailed console output");
+
+
+        var syncCommand = new Command("sync", "Surgically index or purge files matching a path or glob expression in the knowledge graph");
+        syncCommand.AddAlias("sync-file");
+        syncCommand.AddArgument(pathArgument);
+        syncCommand.AddOption(repoOption);
+        syncCommand.AddOption(dbDirOption);
+        syncCommand.AddOption(deletePathOpt);
+        syncCommand.AddOption(contentOpt);
+        syncCommand.AddOption(syncNoIgnoreOpt);
+        syncCommand.AddOption(syncVerboseOpt);
+
+        syncCommand.SetHandler(async (pathOrGlob, repoOpt, dbDir, isDelete, content, noIgnore, verbose) =>
+        {
+            var startDir = repoOpt?.FullName ?? Directory.GetCurrentDirectory();
+            var repoRoot = repoOpt is not null ? startDir : (FindGitRoot(startDir) ?? startDir);
+            var dbPath   = StorageConfig.ResolveDbPath(dbDir?.FullName, repoRoot);
+
+            using var db = new CodeGraphDb(dbPath);
+            db.Migrate();
+
+            // If single file and in-memory content is provided, use SingleFileIndexer directly
+            if (!GlobFileIndexer.IsGlobPattern(pathOrGlob) && content != null)
+            {
+                var singleFileIndexer = new SingleFileIndexer();
+                if (isDelete)
+                {
+                    var result = await singleFileIndexer.DeleteFileAsync(repoRoot, db, pathOrGlob);
+                    Console.WriteLine($"Deleted {result.FilePath}: {result.SymbolsDeleted} symbols, {result.ReferencesDeleted} references ({result.ElapsedMs}ms)");
+                }
+                else
+                {
+                    var result = await singleFileIndexer.UpsertFileAsync(repoRoot, db, pathOrGlob, content);
+                    if (result.Message != null && result.SymbolsUpdated == 0 && result.SymbolsAdded == 0 && result.SymbolsDeleted == 0)
+                    {
+                        Console.WriteLine($"Sync {result.FilePath}: {result.Message} ({result.ElapsedMs}ms)");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Indexed {result.FilePath}: {result.SymbolsUpdated} updated, {result.SymbolsAdded} added, {result.SymbolsDeleted} deleted, {result.ReferencesUpdated} refs ({result.ElapsedMs}ms)");
+                    }
+                }
+                return;
+            }
+
+            var globIndexer = new GlobFileIndexer();
+            var res = await globIndexer.SyncGlobAsync(repoRoot, db, pathOrGlob, isDelete, noIgnore, verbose);
+            if (isDelete)
+            {
+                Console.WriteLine($"Purged {res.FilesDeleted} files matching '{res.Pattern}': {res.SymbolsDeleted} symbols, {res.ReferencesDeleted} references ({res.ElapsedMs}ms)");
+            }
+            else
+            {
+                if (res.FilesProcessed == 1 && res.FilesDeleted == 0)
+                {
+                    Console.WriteLine($"Indexed {res.Pattern}: {res.SymbolsUpdated} updated, {res.SymbolsAdded} added, {res.SymbolsDeleted} deleted, {res.ReferencesUpdated} refs ({res.ElapsedMs}ms)");
+                }
+                else
+                {
+                    Console.WriteLine($"Synced {res.FilesProcessed} files, {res.FilesDeleted} purged matching '{res.Pattern}': {res.SymbolsAdded} added, {res.SymbolsUpdated} updated, {res.SymbolsDeleted} deleted, {res.ReferencesUpdated} refs ({res.ElapsedMs}ms)");
+                }
+            }
+        }, pathArgument, repoOption, dbDirOption, deletePathOpt, contentOpt, syncNoIgnoreOpt, syncVerboseOpt);
+
         // ── root ───────────────────────────────────────────────────────────────────
         var rootCommand = new RootCommand("CodeGraphMcp — local code knowledge graph engine");
         rootCommand.AddCommand(indexCommand);
@@ -370,7 +347,9 @@ public static class CommandFactory
         rootCommand.AddCommand(cleanCommand);
         rootCommand.AddCommand(watchCommand);
         rootCommand.AddCommand(pruneCommand);
+        rootCommand.AddCommand(syncCommand);
         rootCommand.AddCommand(ParsersCommandHandler.CreateParsersCommand());
+        rootCommand.AddCommand(IgnoreCommandHandler.CreateIgnoreCommand());
 
         return rootCommand;
     }

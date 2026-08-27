@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using CodeGraphMcp.Models;
+using CodeGraphMcp.Filtering;
 
 namespace CodeGraphMcp.Db.Queries;
 
@@ -104,6 +105,44 @@ public sealed class SymbolQueries(SqliteConnection connection)
     public void UpsertFileDelta(string filePath, IReadOnlyList<Symbol> symbols)
     {
         UpsertFile(filePath, symbols);
+    }
+
+    /// <summary>Returns all symbols stored for a specific file path.</summary>
+    public IReadOnlyList<Symbol> GetSymbolsByFile(string filePath)
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, symbol_name, symbol_type, class_name, language,
+                   file_path, start_line, end_line, start_byte, end_byte,
+                   signature, doc_comment, is_partial
+            FROM symbols
+            WHERE file_path = @filePath
+            ORDER BY start_line;
+            """;
+        cmd.Parameters.AddWithValue("@filePath", filePath);
+
+        var results = new List<Symbol>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            results.Add(new Symbol
+            {
+                Id         = reader.GetInt64(0),
+                SymbolName = reader.GetString(1),
+                SymbolType = Enum.Parse<SymbolType>(reader.GetString(2)),
+                ClassName  = reader.IsDBNull(3) ? null : reader.GetString(3),
+                Language   = reader.IsDBNull(4) ? null : reader.GetString(4),
+                FilePath   = reader.GetString(5),
+                StartLine  = reader.GetInt32(6),
+                EndLine    = reader.GetInt32(7),
+                StartByte  = reader.GetInt32(8),
+                EndByte    = reader.GetInt32(9),
+                Signature  = reader.IsDBNull(10) ? null : reader.GetString(10),
+                DocComment = reader.IsDBNull(11) ? null : reader.GetString(11),
+                IsPartial  = reader.GetInt32(12) == 1,
+            });
+        }
+        return results;
     }
 
     /// <summary>
@@ -439,6 +478,224 @@ public sealed class SymbolQueries(SqliteConnection connection)
             });
         }
         return results;
+    }
+
+    /// <summary>
+    /// Queries symbols using a transpiled pattern or fallback regex with keyset cursor pagination.
+    /// </summary>
+    public FilterQueryResult<Symbol> FindWithFilter(
+        FilterTranspileResult filter,
+        long cursor = 0,
+        int limit = 500,
+        int offset = 0,
+        string? language = null,
+        SymbolType? symbolType = null)
+    {
+        var effectiveLimit = limit <= 0 ? 500 : limit;
+
+        if (filter.IsTranslatable)
+        {
+            return ExecutePushdownFilterQuery(filter, cursor, effectiveLimit, offset, language, symbolType);
+        }
+        else
+        {
+            return ExecuteStreamingRegexFilterQuery(filter, cursor, effectiveLimit, language, symbolType);
+        }
+    }
+
+    private FilterQueryResult<Symbol> ExecutePushdownFilterQuery(
+        FilterTranspileResult filter,
+        long cursor,
+        int limit,
+        int offset,
+        string? language,
+        SymbolType? symbolType)
+    {
+        using var cmd = connection.CreateCommand();
+        var sql = """
+            SELECT id, symbol_name, symbol_type, class_name, language,
+                   file_path, start_line, end_line, start_byte, end_byte,
+                   signature, doc_comment, is_partial
+            FROM symbols
+            WHERE 1=1
+            """;
+
+        if (cursor > 0)
+        {
+            sql += " AND id > @cursor";
+            cmd.Parameters.AddWithValue("@cursor", cursor);
+        }
+
+        if (!string.IsNullOrEmpty(language))
+        {
+            sql += " AND language = @language COLLATE NOCASE";
+            cmd.Parameters.AddWithValue("@language", language);
+        }
+
+        if (symbolType.HasValue)
+        {
+            sql += " AND symbol_type = @symbolType";
+            cmd.Parameters.AddWithValue("@symbolType", symbolType.Value.ToString());
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.SqlClause))
+        {
+            sql += $" AND {filter.SqlClause}";
+            foreach (var p in filter.Parameters)
+            {
+                cmd.Parameters.Add(new SqliteParameter(p.ParameterName, p.Value));
+            }
+        }
+
+        sql += " ORDER BY id ASC LIMIT @fetchLimit";
+        cmd.Parameters.AddWithValue("@fetchLimit", limit + 1);
+
+        if (cursor == 0 && offset > 0)
+        {
+            sql += " OFFSET @offset";
+            cmd.Parameters.AddWithValue("@offset", offset);
+        }
+
+        cmd.CommandText = sql;
+
+        var items = new List<Symbol>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            items.Add(new Symbol
+            {
+                Id         = reader.GetInt64(0),
+                SymbolName = reader.GetString(1),
+                SymbolType = Enum.Parse<SymbolType>(reader.GetString(2)),
+                ClassName  = reader.IsDBNull(3) ? null : reader.GetString(3),
+                Language   = reader.IsDBNull(4) ? null : reader.GetString(4),
+                FilePath   = reader.GetString(5),
+                StartLine  = reader.GetInt32(6),
+                EndLine    = reader.GetInt32(7),
+                StartByte  = reader.GetInt32(8),
+                EndByte    = reader.GetInt32(9),
+                Signature  = reader.IsDBNull(10) ? null : reader.GetString(10),
+                DocComment = reader.IsDBNull(11) ? null : reader.GetString(11),
+                IsPartial  = reader.GetInt32(12) == 1,
+            });
+        }
+
+        bool hasMore = items.Count > limit;
+        var resultList = hasMore ? items.Take(limit).ToList() : items;
+        long nextCursor = resultList.Count > 0 ? resultList[^1].Id : cursor;
+
+        return new FilterQueryResult<Symbol>
+        {
+            Items = resultList,
+            NextCursor = nextCursor,
+            HasMore = hasMore,
+            TotalReturned = resultList.Count,
+            Filter = filter.OriginalPattern,
+            TranspiledToSql = true
+        };
+    }
+
+    private FilterQueryResult<Symbol> ExecuteStreamingRegexFilterQuery(
+        FilterTranspileResult filter,
+        long cursor,
+        int limit,
+        string? language,
+        SymbolType? symbolType)
+    {
+        var regex = filter.FallbackRegex!;
+        var matched = new List<Symbol>();
+        long currentCursor = cursor;
+        bool hasMore = false;
+        const int chunkSize = 1000;
+
+        while (matched.Count < limit)
+        {
+            using var cmd = connection.CreateCommand();
+            var sql = """
+                SELECT id, symbol_name, symbol_type, class_name, language,
+                       file_path, start_line, end_line, start_byte, end_byte,
+                       signature, doc_comment, is_partial
+                FROM symbols
+                WHERE id > @cursor
+                """;
+
+            if (!string.IsNullOrEmpty(language))
+            {
+                sql += " AND language = @language COLLATE NOCASE";
+                cmd.Parameters.AddWithValue("@language", language);
+            }
+
+            if (symbolType.HasValue)
+            {
+                sql += " AND symbol_type = @symbolType";
+                cmd.Parameters.AddWithValue("@symbolType", symbolType.Value.ToString());
+            }
+
+            sql += " ORDER BY id ASC LIMIT @chunkSize";
+            cmd.Parameters.AddWithValue("@cursor", currentCursor);
+            cmd.Parameters.AddWithValue("@chunkSize", chunkSize);
+            cmd.CommandText = sql;
+
+            var chunk = new List<Symbol>();
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    chunk.Add(new Symbol
+                    {
+                        Id         = reader.GetInt64(0),
+                        SymbolName = reader.GetString(1),
+                        SymbolType = Enum.Parse<SymbolType>(reader.GetString(2)),
+                        ClassName  = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        Language   = reader.IsDBNull(4) ? null : reader.GetString(4),
+                        FilePath   = reader.GetString(5),
+                        StartLine  = reader.GetInt32(6),
+                        EndLine    = reader.GetInt32(7),
+                        StartByte  = reader.GetInt32(8),
+                        EndByte    = reader.GetInt32(9),
+                        Signature  = reader.IsDBNull(10) ? null : reader.GetString(10),
+                        DocComment = reader.IsDBNull(11) ? null : reader.GetString(11),
+                        IsPartial  = reader.GetInt32(12) == 1,
+                    });
+                }
+            }
+
+            if (chunk.Count == 0)
+            {
+                hasMore = false;
+                break;
+            }
+
+            foreach (var sym in chunk)
+            {
+                currentCursor = sym.Id;
+                if (regex.IsMatch(sym.SymbolName))
+                {
+                    matched.Add(sym);
+                    if (matched.Count >= limit)
+                    {
+                        hasMore = chunk.IndexOf(sym) < chunk.Count - 1 || chunk.Count == chunkSize;
+                        break;
+                    }
+                }
+            }
+
+            if (chunk.Count < chunkSize && matched.Count < limit)
+            {
+                hasMore = false;
+                break;
+            }
+        }
+
+        return new FilterQueryResult<Symbol>
+        {
+            Items = matched,
+            NextCursor = currentCursor,
+            HasMore = hasMore,
+            TotalReturned = matched.Count,
+            Filter = filter.OriginalPattern,
+            TranspiledToSql = false
+        };
     }
 }
 

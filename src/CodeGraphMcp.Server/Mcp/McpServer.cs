@@ -40,6 +40,8 @@ public static class McpServer
             .AddSingleton<IWorkspaceBufferManager>(sp =>
                 new WorkspaceBufferManager(sp.GetRequiredService<IParserRegistry>()))
             .AddSingleton<IWorkspaceLinkerManager, WorkspaceLinkerManager>()
+            .AddSingleton<ISingleFileIndexer>(sp =>
+                new SingleFileIndexer(sp.GetRequiredService<IParserRegistry>()))
             .AddSingleton<IDynamicWorkspaceService>(sp =>
                 new DynamicWorkspaceService(sp.GetRequiredService<IWorkspaceDbManager>(), repoPath, sp.GetRequiredService<IParserRegistry>()))
             .AddSingleton(sp =>
@@ -62,7 +64,9 @@ public static class McpServer
             .WithTools<Tools.SearchCodebaseGraphTool>(jsonOptions)
             .WithTools<Tools.GetDiffImpactTool>(jsonOptions)
             .WithTools<Tools.GetServiceStackDtoContractTool>(jsonOptions)
-            .WithTools<Tools.GetSupportedLanguagesTool>(jsonOptions);
+            .WithTools<Tools.GetSupportedLanguagesTool>(jsonOptions)
+            .WithTools<Tools.SyncFileTool>(jsonOptions)
+            .WithTools<Tools.SyncGitDiffTool>(jsonOptions);
 
         var host = builder.Build();
 

@@ -22,6 +22,8 @@ namespace CodeGraphMcp.Mcp;
 [JsonSerializable(typeof(SupportedLanguagesResult))]
 [JsonSerializable(typeof(SupportedLanguageInfo))]
 [JsonSerializable(typeof(List<SupportedLanguageInfo>))]
+[JsonSerializable(typeof(SyncFileResult))]
+[JsonSerializable(typeof(SyncGitDiffResult))]
 // primitive / built-ins used as tool parameters and inside records
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(bool))]

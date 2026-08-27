@@ -32,12 +32,9 @@ public sealed class CodeGraphDb : IDisposable
         _connection = new SqliteConnection(connectionString);
         _connection.Open();
 
-        if (!readOnly)
-        {
-            using var wal = _connection.CreateCommand();
-            wal.CommandText = "PRAGMA journal_mode=WAL;";
-            wal.ExecuteNonQuery();
-        }
+        using var pragma = _connection.CreateCommand();
+        pragma.CommandText = readOnly ? "PRAGMA foreign_keys=ON;" : "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;";
+        pragma.ExecuteNonQuery();
 
         Symbols        = new SymbolQueries(_connection);
         References     = new ReferenceQueries(_connection);

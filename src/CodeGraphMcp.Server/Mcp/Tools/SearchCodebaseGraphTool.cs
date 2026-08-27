@@ -76,19 +76,39 @@ public sealed class SearchCodebaseGraphTool(
         var effectiveOffset = Math.Max(0, offset);
         var dbFetchLimit = Math.Max(effectiveOffset + effectiveLimit, 500);
 
-        // 1. SQLite results
-        var dbMatches = db.Symbols.FindByName(
-                pattern,
+        List<SearchMatch> dbMatches;
+        if (compiledRegex != null)
+        {
+            var transpile = CodeGraphMcp.Filtering.FilterTranspiler.Transpile(regex);
+            var queryResult = db.Symbols.FindWithFilter(
+                filter: transpile,
+                cursor: 0,
                 limit: dbFetchLimit,
-                offset: 0,
                 language: normLang,
-                symbolType: parsedType)
-            .Where(s => !exactMatch || s.SymbolName.Equals(pattern, StringComparison.OrdinalIgnoreCase))
-            .Where(s => compiledRegex is null || compiledRegex.IsMatch(s.SymbolName))
-            .Select(s => new SearchMatch(
-                s.SymbolName, s.SymbolType.ToString(), s.Language,
-                s.FilePath, s.StartLine, s.EndLine, s.DocComment, IsLive: false))
-            .ToList();
+                symbolType: parsedType);
+
+            dbMatches = queryResult.Items
+                .Where(s => !exactMatch || s.SymbolName.Equals(pattern, StringComparison.OrdinalIgnoreCase))
+                .Select(s => new SearchMatch(
+                    s.SymbolName, s.SymbolType.ToString(), s.Language,
+                    s.FilePath, s.StartLine, s.EndLine, s.DocComment, IsLive: false))
+                .ToList();
+        }
+        else
+        {
+            dbMatches = db.Symbols.FindByName(
+                    pattern,
+                    limit: dbFetchLimit,
+                    offset: 0,
+                    language: normLang,
+                    symbolType: parsedType)
+                .Where(s => !exactMatch || s.SymbolName.Equals(pattern, StringComparison.OrdinalIgnoreCase))
+                .Select(s => new SearchMatch(
+                    s.SymbolName, s.SymbolType.ToString(), s.Language,
+                    s.FilePath, s.StartLine, s.EndLine, s.DocComment, IsLive: false))
+                .ToList();
+        }
+
 
         // 2. Dirty buffer results
         List<SearchMatch> dirtyMatches;

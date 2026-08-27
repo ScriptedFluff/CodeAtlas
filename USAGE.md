@@ -36,6 +36,7 @@ Usage:
 Commands:
   index <repo-path>    Parse and index a repository into the knowledge graph
   query <symbol-name>  Query the knowledge graph for a symbol
+  sync-file <path>     Surgically index or delete a single file in milliseconds
   status <repo-path>   Show the current index state for a repository
   parsers              Manage modular drop-in language parser plugins
   watch <repo-path>    Continuously re-index on git changes
@@ -303,6 +304,20 @@ Scans the global index storage cache for database files whose repository roots o
 - **Parameters:**
   - `dbDir`: Optional override path to database cache directory.
   - `dryRun`: Set `true` to preview candidate databases to prune without performing actual deletion.
+
+#### 8. `sync_file`
+Surgically indexes or deletes a single file in the SQLite knowledge graph in milliseconds (< 20ms). Atomically updates symbol definitions, line numbers, doc comments, signatures, and caller reference edges. Existing incoming caller edges from unchanged files are preserved across signature/line updates without duplicates or orphans. Supports passing in-memory `content` to sync editor buffers before saving to disk.
+- **Parameters:**
+  - `filePath`: **Required.** Relative or absolute path of the file to upsert or delete.
+  - `content`: Optional in-memory file content string.
+  - `delete`: Optional boolean (`true` to remove the file and its symbols/edges from index).
+  - `targetDirectory`: Optional workspace root override.
+
+#### 9. `sync_git_diff`
+Performs a fast incremental delta sync of all git-modified and dirty files against the local SQLite index without a full repository scan.
+- **Parameters:**
+  - `targetDirectory`: Optional workspace root override.
+  - `noIgnore`: Optional boolean (`true` to bypass `.gitignore` filtering).
 
 ### MCP Configuration Example (`mcp_config.json`)
 

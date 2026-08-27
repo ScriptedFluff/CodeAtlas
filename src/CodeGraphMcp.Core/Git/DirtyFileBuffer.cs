@@ -171,8 +171,30 @@ public sealed class DirtyFileBuffer
     public int DirtyFileCount => _cache.Count;
 
     /// <summary>
+    /// Searches all dirty symbols using a transpiled filter or fallback regex, optionally filtered by language and symbol type.
+    /// </summary>
+    public IReadOnlyList<Symbol>? FindWithFilter(
+        Filtering.FilterTranspileResult filter,
+        string? language = null,
+        SymbolType? symbolType = null)
+    {
+        var normLang = Config.LanguageNormalizer.Normalize(language);
+        var regex = filter.RegexMatcher;
+
+        var allDirty = _cache.Values
+            .SelectMany(s => s)
+            .Where(s => regex.IsMatch(s.SymbolName))
+            .Where(s => normLang is null || string.Equals(s.Language, normLang, StringComparison.OrdinalIgnoreCase))
+            .Where(s => symbolType is null || s.SymbolType == symbolType.Value)
+            .ToList();
+
+        return allDirty.Count > 0 ? allDirty : null;
+    }
+
+    /// <summary>
     /// Returns all symbols across all dirty files — used for wildcard search.
     /// </summary>
     public IEnumerable<Symbol> GetAllDirtySymbols() =>
         _cache.Values.SelectMany(s => s);
 }
+

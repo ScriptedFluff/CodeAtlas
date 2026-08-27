@@ -84,6 +84,20 @@ Scans index cache directories for database files whose original repository folde
 {}
 ```
 
+### `sync_file`
+Surgically updates or deletes a single file in the SQLite knowledge graph in milliseconds (< 20ms). In-place updates preserve existing caller references from other files. Supports in-memory `content` to sync uncommitted editor buffers.
+```json
+{
+  "filePath": "src/Services/UserService.cs"
+}
+```
+
+### `sync_git_diff`
+Performs a fast incremental delta sync of all git-modified and dirty files against the local SQLite index without a full repository scan.
+```json
+{}
+```
+
 ---
 
 ## 3. CLI Commands Quick Reference

@@ -2,8 +2,15 @@ namespace CodeGraphMcp.Indexer;
 
 public static class WorkspacePathNormalizer
 {
-    public static string NormalizeRelativePath(string rootPath, string fullPath)
+    public static string NormalizeRelativePath(string rootPath, string filePath)
     {
+        if (string.IsNullOrWhiteSpace(filePath))
+            return string.Empty;
+
+        var fullPath = Path.IsPathRooted(filePath)
+            ? Path.GetFullPath(filePath)
+            : Path.GetFullPath(Path.Combine(rootPath, filePath));
+
         var relative = Path.GetRelativePath(rootPath, fullPath);
         return relative.Replace('\\', '/');
     }

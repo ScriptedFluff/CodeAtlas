@@ -77,41 +77,41 @@ public sealed class AppConfig
             var root = doc.RootElement;
 
             // 1. Check top-level "Include", "Ignore" or "IgnorePatterns"
-            if (root.TryGetProperty("Include", out var topInclude) && topInclude.ValueKind == JsonValueKind.Array)
+            if ((root.TryGetProperty("Include", out var topInclude) || root.TryGetProperty("include", out topInclude)) && topInclude.ValueKind == JsonValueKind.Array)
             {
                 AddPatterns(config.IncludePatterns, topInclude);
             }
 
-            if (root.TryGetProperty("Ignore", out var topIgnore) && topIgnore.ValueKind == JsonValueKind.Array)
+            if ((root.TryGetProperty("Ignore", out var topIgnore) || root.TryGetProperty("ignore", out topIgnore)) && topIgnore.ValueKind == JsonValueKind.Array)
             {
                 AddPatterns(config.IgnorePatterns, topIgnore);
             }
-            else if (root.TryGetProperty("IgnorePatterns", out var topPatterns) && topPatterns.ValueKind == JsonValueKind.Array)
+            else if ((root.TryGetProperty("IgnorePatterns", out var topPatterns) || root.TryGetProperty("ignorePatterns", out topPatterns)) && topPatterns.ValueKind == JsonValueKind.Array)
             {
                 AddPatterns(config.IgnorePatterns, topPatterns);
             }
 
-            if (root.TryGetProperty("IgnoreDirectories", out var topDirs) && topDirs.ValueKind == JsonValueKind.Array)
+            if ((root.TryGetProperty("IgnoreDirectories", out var topDirs) || root.TryGetProperty("ignoreDirectories", out topDirs)) && topDirs.ValueKind == JsonValueKind.Array)
             {
                 AddPatterns(config.IgnoreDirectories, topDirs);
             }
 
             // 2. Check nested "CodeGraph" section (e.g. appsettings.json style)
-            if (root.TryGetProperty("CodeGraph", out var section))
+            if (root.TryGetProperty("CodeGraph", out var section) || root.TryGetProperty("codeGraph", out section))
             {
-                if (section.TryGetProperty("Include", out var secInclude) && secInclude.ValueKind == JsonValueKind.Array)
+                if ((section.TryGetProperty("Include", out var secInclude) || section.TryGetProperty("include", out secInclude)) && secInclude.ValueKind == JsonValueKind.Array)
                 {
                     AddPatterns(config.IncludePatterns, secInclude);
                 }
-                if (section.TryGetProperty("Ignore", out var secIgnore) && secIgnore.ValueKind == JsonValueKind.Array)
+                if ((section.TryGetProperty("Ignore", out var secIgnore) || section.TryGetProperty("ignore", out secIgnore)) && secIgnore.ValueKind == JsonValueKind.Array)
                 {
                     AddPatterns(config.IgnorePatterns, secIgnore);
                 }
-                if (section.TryGetProperty("IgnorePatterns", out var secPatterns) && secPatterns.ValueKind == JsonValueKind.Array)
+                if ((section.TryGetProperty("IgnorePatterns", out var secPatterns) || section.TryGetProperty("ignorePatterns", out secPatterns)) && secPatterns.ValueKind == JsonValueKind.Array)
                 {
                     AddPatterns(config.IgnorePatterns, secPatterns);
                 }
-                if (section.TryGetProperty("IgnoreDirectories", out var secDirs) && secDirs.ValueKind == JsonValueKind.Array)
+                if ((section.TryGetProperty("IgnoreDirectories", out var secDirs) || section.TryGetProperty("ignoreDirectories", out secDirs)) && secDirs.ValueKind == JsonValueKind.Array)
                 {
                     AddPatterns(config.IgnoreDirectories, secDirs);
                 }
