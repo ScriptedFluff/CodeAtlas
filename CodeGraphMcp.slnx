@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/CodeGraphMcp.Abstractions/CodeGraphMcp.Abstractions.csproj" />
     <Project Path="src/CodeGraphMcp.Core/CodeGraphMcp.Core.csproj" />
     <Project Path="src/CodeGraphMcp.Server/CodeGraphMcp.Server.csproj" />
     <Project Path="src/CodeGraphMcp.Cli/CodeGraphMcp.Cli.csproj" />

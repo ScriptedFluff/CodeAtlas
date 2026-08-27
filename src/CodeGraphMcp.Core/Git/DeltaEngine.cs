@@ -225,7 +225,7 @@ public sealed class DeltaEngine
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DeltaEngine] Warning: failed to re-parse {relPath}: {ex.Message}");
+                Console.Error.WriteLine($"[DeltaEngine] Warning: failed to re-parse {relPath}: {ex.Message}");
             }
         });
 

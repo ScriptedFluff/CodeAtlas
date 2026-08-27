@@ -12,6 +12,7 @@ Write-Host "========================================" -ForegroundColor Cyan
 
 # Terminate any running server/CLI instances before publishing
 Get-Process -Name CodeGraphMcp,CodeGraphMcp.Server,CodeGraphMcp.Cli -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 500
 
 $serverOut = Join-Path $publishDir "server"
 $cliOut = Join-Path $publishDir "cli"
@@ -28,6 +29,28 @@ Copy-Item -Path "$cliOut\*" -Destination $publishDir -Force
 Copy-Item -Path "$cliOut\CodeGraphMcp.exe" -Destination "$cliOut\CodeGraphMcp.Cli.exe" -Force
 if (Test-Path "$cliOut\CodeGraphMcp.pdb") {
     Copy-Item -Path "$cliOut\CodeGraphMcp.pdb" -Destination "$cliOut\CodeGraphMcp.Cli.pdb" -Force
+}
+
+function Safe-CopyFile {
+    param([string]$Source, [string]$Destination)
+    $destFile = if (Test-Path $Destination -PathType Container) {
+        Join-Path $Destination (Split-Path $Source -Leaf)
+    } else {
+        $Destination
+    }
+    try {
+        Copy-Item -Path $Source -Destination $destFile -Force -ErrorAction Stop
+    } catch {
+        if (Test-Path $destFile) {
+            $tempBak = "$destFile.$([System.Guid]::NewGuid().ToString('N')).bak"
+            try {
+                Move-Item -Path $destFile -Destination $tempBak -Force -ErrorAction Stop
+                Copy-Item -Path $Source -Destination $destFile -Force -ErrorAction Stop
+            } catch {
+                Write-Warning "Could not update locked file '$destFile': $_"
+            }
+        }
+    }
 }
 
 # 2. Build and copy all Drop-in Parser Plugins into Server, CLI, and Root Parsers directories
@@ -55,9 +78,9 @@ foreach ($proj in $parserProjects) {
     # Copy managed assemblies and win-x64 native assets
     $filesToCopy = Get-ChildItem -Path $binDir -File | Where-Object { $_.Extension -in @(".dll", ".pdb", ".json") }
     foreach ($file in $filesToCopy) {
-        Copy-Item -Path $file.FullName -Destination $serverParserDest -Force
-        Copy-Item -Path $file.FullName -Destination $cliParserDest -Force
-        Copy-Item -Path $file.FullName -Destination $rootParserDest -Force
+        Safe-CopyFile -Source $file.FullName -Destination $serverParserDest
+        Safe-CopyFile -Source $file.FullName -Destination $cliParserDest
+        Safe-CopyFile -Source $file.FullName -Destination $rootParserDest
     }
     
     # Copy win-x64 runtimes if present (e.g. tree-sitter native dlls)
@@ -69,9 +92,11 @@ foreach ($proj in $parserProjects) {
         if (-not (Test-Path $serverNative)) { New-Item -ItemType Directory -Path $serverNative -Force | Out-Null }
         if (-not (Test-Path $cliNative)) { New-Item -ItemType Directory -Path $cliNative -Force | Out-Null }
         if (-not (Test-Path $rootNative)) { New-Item -ItemType Directory -Path $rootNative -Force | Out-Null }
-        Copy-Item -Path "$winRuntime\*" -Destination $serverNative -Force
-        Copy-Item -Path "$winRuntime\*" -Destination $cliNative -Force
-        Copy-Item -Path "$winRuntime\*" -Destination $rootNative -Force
+        foreach ($nativeFile in (Get-ChildItem -Path "$winRuntime\*" -File)) {
+            Safe-CopyFile -Source $nativeFile.FullName -Destination $serverNative
+            Safe-CopyFile -Source $nativeFile.FullName -Destination $cliNative
+            Safe-CopyFile -Source $nativeFile.FullName -Destination $rootNative
+        }
     }
 }
 

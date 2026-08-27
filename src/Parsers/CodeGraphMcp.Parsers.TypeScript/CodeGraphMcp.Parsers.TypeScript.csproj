@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <PackageReference Include="TreeSitter.DotNet" Version="1.3.0" />
+    <Compile Include="..\Common\JsTsParserBase.cs" Link="Common\JsTsParserBase.cs" />
   </ItemGroup>
 </Project>

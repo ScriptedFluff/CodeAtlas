@@ -24,4 +24,8 @@
     <PackageReference Include="TreeSitter.DotNet" Version="1.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\CodeGraphMcp.Abstractions\CodeGraphMcp.Abstractions.csproj" />
+  </ItemGroup>
+
 </Project>

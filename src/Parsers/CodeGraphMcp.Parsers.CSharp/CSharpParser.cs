@@ -48,7 +48,7 @@ public sealed class CSharpParser : ILanguageParser
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CSharpParser Error] {ex}");
+            Console.Error.WriteLine($"[CSharpParser Error] {ex}");
         }
 
         return new FileParseResult(symbols, refs);

@@ -9,15 +9,19 @@
 ```
 CodeGraphMcp.slnx
 ├── src/
+│   ├── CodeGraphMcp.Abstractions/ # Class Library (.dll) - Zero-dependency NuGet contracts & models
+│   │   ├── Models/                # Symbol, SymbolReference, SymbolType
+│   │   └── Parser/                # ILanguageParser, ParserMetadata, ParserMetadataAttribute, FileParseResult
+│   │
 │   ├── CodeGraphMcp.Core/         # Class Library (.dll) - Domain logic & indexing engine
 │   │   ├── Config/                # CodeGraphSettings, StorageConfig, WorkspacePathResolver
 │   │   ├── Db/                    # SqliteDbFactory, Schema Migrations, Symbol Repositories, WorktreePruner
 │   │   ├── Indexer/               # IndexOrchestrator, SolutionRootResolver, DynamicWorkspaceService
-│   │   ├── Parser/                # ILanguageParser, ParserRegistry, IParserRegistry, ParserMetadata
+│   │   ├── Parser/                # IParserRegistry, ParserRegistry
 │   │   ├── Plugins/               # ParserLoadContext, DirectoryParserPluginLoader, ParserSecurityEvaluator
 │   │   ├── Git/                   # GitHelpers, DeltaEngine, DirtyFileBuffer, GitIgnoreMatcher
 │   │   ├── CrossStack/            # ServiceStack DTO Contract Resolver & Linkers
-│   │   └── Models/                # Symbol, SymbolReference, IndexResult, CallerEntry
+│   │   └── Models/                # IndexResult, CallerEntry, CrossStackMapping
 │   │
 │   ├── Parsers/                   # Standalone Drop-in Language Parser Plugins
 │   │   ├── CodeGraphMcp.Parsers.CSharp/
@@ -40,8 +44,13 @@ CodeGraphMcp.slnx
 
 ### Decoupled Subsystem Responsibilities
 
-1. **Core Domain Library (`CodeGraphMcp.Core`)**:
-    - **Dynamic Plugin Engine (`Plugins/`)**: Loads drop-in parser assemblies into collectible `AssemblyLoadContext` instances. Delegates `CodeGraphMcp.Core` and `TreeSitter` to host ALC to preserve type identity for `ILanguageParser` and `TreeSitter.Node`.
+1. **Abstractions Library (`CodeGraphMcp.Abstractions`)**:
+    - **Standalone NuGet Package**: Zero-dependency library targeting `.NET 10.0`, `.NET 8.0`, and `.NET Standard 2.0`.
+    - **Core Contracts & Models**: Exposes `ILanguageParser`, `Symbol`, `SymbolReference`, `SymbolType`, `ParserMetadata`, `ParserMetadataAttribute`, and `FileParseResult`.
+    - Enables 3rd party developers and community contributors to write custom drop-in parsers without referencing engine runtime dependencies.
+
+2. **Core Domain Library (`CodeGraphMcp.Core`)**:
+    - **Dynamic Plugin Engine (`Plugins/`)**: Loads drop-in parser assemblies into collectible `AssemblyLoadContext` instances. Delegates `CodeGraphMcp.Abstractions`, `CodeGraphMcp.Core`, and `TreeSitter` to host ALC to preserve type identity for `ILanguageParser` and `TreeSitter.Node`.
     - **Multi-Tier Directory Resolver (`ParserDirectoryResolver`)**: Scans `Environment` (`CODEGRAPH_PARSERS_DIR`), `User` (`%LOCALAPPDATA%\CodeGraphMcp\Parsers`), and `Application` (`{AppBase}\Parsers`) locations.
     - **Security Policy Engine (`ParserSecurityEvaluator`)**: Prevents DLL hijacking and unprivileged shadowing (`Strict`, `AllowAll`, `AllowList`).
     - **Streaming Indexing Pipeline**: Uses a `Channel`-based Producer-Consumer pipeline to stream parsed AST results asynchronously from parallel CPU workers to a background SQLite writer task in 250-file batches without CPU idle time.
@@ -245,7 +254,7 @@ When editing files in an IDE, AI agents query the MCP server. `CodeGraphMcp` rea
 To add support for a new programming language (e.g. Rust, Go, Python, SQL) as an independent drop-in plugin:
 
 ### Step 1: Create the Parser Project
-Create a class library under `src/Parsers/CodeGraphMcp.Parsers.<Language>/`:
+Create a class library under `src/Parsers/CodeGraphMcp.Parsers.<Language>/` (or as a standalone third-party repository):
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -257,7 +266,8 @@ Create a class library under `src/Parsers/CodeGraphMcp.Parsers.<Language>/`:
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\CodeGraphMcp.Core\CodeGraphMcp.Core.csproj" Private="false" ExcludeAssets="runtime" />
+    <!-- Reference the standalone NuGet package or internal project -->
+    <PackageReference Include="CodeGraphMcp.Abstractions" Version="1.0.0" />
   </ItemGroup>
 </Project>
 ```
@@ -269,31 +279,22 @@ using CodeGraphMcp.Parser;
 
 namespace CodeGraphMcp.Parsers.Rust;
 
+[ParserMetadata("rust", "Rust Parser", "1.0.0", Description = "Rust language AST symbol parser", Author = "Community Contributor")]
 public sealed class RustParser : ILanguageParser
 {
     public string Language => "rust";
-    public IReadOnlyList<string> FileExtensions { get; } = [".rs"];
+    public IReadOnlyList<string> FileExtensions => [".rs"];
 
-    public ParserMetadata Metadata { get; } = new(
-        Id: "rust",
-        Language: "rust",
-        FileExtensions: [".rs"],
-        Version: "1.0.0",
-        Description: "Rust language AST symbol parser",
-        Author: "Community Contributor"
-    );
-
-    public bool CanParse(string filePath) =>
-        filePath.EndsWith(".rs", StringComparison.OrdinalIgnoreCase);
-
-    public ParseResult Parse(string filePath, string sourceCode)
+    public IEnumerable<Symbol> Parse(string filePath, string sourceCode)
     {
-        var symbols = new List<Symbol>();
-        var references = new List<SymbolReference>();
+        // Parse AST and yield Symbol instances...
+        yield break;
+    }
 
-        // Parse AST (e.g. TreeSitter, Roslyn, custom grammar)...
-
-        return new ParseResult(symbols, references);
+    public IEnumerable<SymbolReference> ParseReferences(string filePath, string sourceCode)
+    {
+        // Extract cross-file references (calls, type usages, imports)...
+        yield break;
     }
 }
 ```

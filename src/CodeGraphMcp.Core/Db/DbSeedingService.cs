@@ -39,7 +39,7 @@ public static class DbSeedingService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[DbSeedingService] Warning: Seeding check failed: {ex.Message}");
+            Console.Error.WriteLine($"[DbSeedingService] Warning: Seeding check failed: {ex.Message}");
         }
 
         return null;

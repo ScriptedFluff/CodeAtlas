@@ -151,11 +151,18 @@ public sealed class DirtyFileBuffer
     }
 
     /// <summary>
-    /// Searches all dirty symbols by name, optionally filtered by language.
+    /// Searches all dirty symbols by name or glob pattern, optionally filtered by language.
     /// Returns null if the buffer has no dirty state matching the name.
     /// </summary>
     public IReadOnlyList<Symbol>? FindByName(string symbolName, string? language = null)
     {
+        var kind = Filtering.QueryPatternClassifier.Classify(symbolName);
+        if (kind == Filtering.QueryPatternKind.GlobPattern)
+        {
+            var transpile = Filtering.FilterTranspiler.TranspilePrimaryQuery(symbolName);
+            return FindWithFilter(transpile, language);
+        }
+
         var normLang = Config.LanguageNormalizer.Normalize(language);
         var allDirty = _cache.Values
             .SelectMany(s => s)

@@ -218,7 +218,7 @@ public sealed class SymbolQueries(SqliteConnection connection)
     }
 
 
-    /// <summary>Find symbols by name (exact or substring match, case-insensitive) with optional language, type filtering, and pagination.</summary>
+    /// <summary>Find symbols by name or glob pattern (with strict boundary preservation) with optional language, type filtering, and pagination.</summary>
     public IReadOnlyList<Symbol> FindByName(
         string symbolName,
         int limit = 500,
@@ -226,6 +226,26 @@ public sealed class SymbolQueries(SqliteConnection connection)
         string? language = null,
         SymbolType? symbolType = null)
     {
+        var kind = QueryPatternClassifier.Classify(symbolName);
+        if (kind == QueryPatternKind.GlobPattern)
+        {
+            var transpile = FilterTranspiler.TranspilePrimaryQuery(symbolName);
+            var queryResult = FindWithFilter(
+                transpile,
+                cursor: 0,
+                limit: limit,
+                offset: offset,
+                language: language,
+                symbolType: symbolType);
+            return queryResult.Items;
+        }
+
+        if (kind == QueryPatternKind.ComplexRegex)
+        {
+            // Fail fast for primary queries with complex regex
+            FilterTranspiler.TranspilePrimaryQuery(symbolName);
+        }
+
         using var cmd = connection.CreateCommand();
         var sql = """
             SELECT id, symbol_name, symbol_type, class_name, language,

@@ -28,7 +28,8 @@ public sealed class ParserLoadContext : AssemblyLoadContext
     protected override Assembly? Load(AssemblyName assemblyName)
     {
         // Share Core abstractions and TreeSitter with host so type identity matches ILanguageParser, Symbol, Node, etc.
-        if (string.Equals(assemblyName.Name, "CodeGraphMcp.Core", StringComparison.OrdinalIgnoreCase) ||
+        if (string.Equals(assemblyName.Name, "CodeGraphMcp.Abstractions", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(assemblyName.Name, "CodeGraphMcp.Core", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(assemblyName.Name, "TreeSitter", StringComparison.OrdinalIgnoreCase))
         {
             return null;

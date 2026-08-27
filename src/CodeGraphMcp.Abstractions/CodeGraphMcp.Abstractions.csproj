@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net10.0;net8.0;netstandard2.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+
+    <!-- NuGet Package Properties -->
+    <PackageId>CodeGraphMcp.Abstractions</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Garry Flanagan, ScriptedFluff</Authors>
+    <Description>Pure interfaces and contract models for extending the CodeGraphMcp indexing engine.</Description>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <RepositoryUrl>https://github.com/ScriptedFluff/CodeGraphMcp</RepositoryUrl>
+    <PackageTags>codegraph;mcp;parser;ast;treesitter;symbol-graph;code-analysis</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

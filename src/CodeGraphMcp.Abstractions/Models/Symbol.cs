@@ -17,4 +17,3 @@ public sealed record Symbol
     public string? DocComment { get; init; }        // XML doc summary (C#) or JSDoc (TS)
     public bool IsPartial { get; init; }            // True for C# partial classes/types or TS merged interfaces/namespaces
 }
-

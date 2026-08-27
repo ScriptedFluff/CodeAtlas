@@ -20,13 +20,21 @@ public static class McpServer
         string? dbPath = null,
         CancellationToken ct = default)
     {
+        // Safeguard: Redirect standard Console.Out to Console.Error so any stray Console.WriteLine calls go to stderr.
+        // The MCP stdio server transport opens and writes directly to Console.OpenStandardOutput().
+        Console.SetOut(Console.Error);
+
         var parsers = GetParsers();
 
         var builder = Host.CreateApplicationBuilder();
 
-        // Suppress all framework logs below Warning.
-        // The MCP SDK routes remaining logs to stderr — never stdout —
-        // so the JSON-RPC pipe on stdout stays clean.
+        // Route all framework and application logs exclusively to stderr.
+        // stdout is strictly reserved for the JSON-RPC stdio transport pipe.
+        builder.Logging.ClearProviders();
+        builder.Logging.AddConsole(options =>
+        {
+            options.LogToStandardErrorThreshold = LogLevel.Trace;
+        });
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
 
         var jsonOptions = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);

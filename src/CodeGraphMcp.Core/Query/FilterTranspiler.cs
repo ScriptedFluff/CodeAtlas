@@ -5,7 +5,7 @@ using Microsoft.Data.Sqlite;
 namespace CodeGraphMcp.Filtering;
 
 /// <summary>
-/// Parser and SQL transpiler for filter expressions.
+/// Parser and SQL transpiler for filter expressions and primary query globs.
 /// Translates pattern and regex expressions to native SQLite WHERE clauses (LIKE, GLOB, OR)
 /// or provides a compiled .NET Regex for streaming chunked fallback.
 /// </summary>
@@ -42,10 +42,10 @@ public static class FilterTranspiler
             {
                 var parameters = new List<SqliteParameter>();
                 int paramCounter = 0;
-                var sql = EmitSqlClause(ast, columnName, paramPrefix, ref paramCounter, parameters);
+                var sql = EmitSqlClause(ast, columnName, paramPrefix, ref paramCounter, parameters, exactGlobBoundaries: false);
                 if (!string.IsNullOrWhiteSpace(sql))
                 {
-                    var regexMatcher = BuildRegexMatcher(ast, pattern);
+                    var regexMatcher = BuildRegexMatcher(ast, pattern, exactGlobBoundaries: false);
                     return new FilterTranspileResult(
                         IsTranslatable: true,
                         SqlClause: sql,
@@ -79,12 +79,81 @@ public static class FilterTranspiler
         }
     }
 
-    private static Regex BuildRegexMatcher(FilterNode? ast, string pattern)
+    /// <summary>
+    /// Transpiles a primary query pattern into a SQLite WHERE clause with strict boundary preservation.
+    /// Throws ArgumentException if the pattern contains complex regex constructs not translatable to SQL.
+    /// </summary>
+    public static FilterTranspileResult TranspilePrimaryQuery(
+        string pattern,
+        string columnName = "symbol_name",
+        string paramPrefix = "pq")
+    {
+        if (string.IsNullOrWhiteSpace(pattern))
+        {
+            var matchAll = new Regex(".*", RegexOptions.Compiled, RegexTimeout);
+            return new FilterTranspileResult(
+                IsTranslatable: true,
+                SqlClause: null,
+                Parameters: Array.Empty<SqliteParameter>(),
+                FallbackRegex: null,
+                RegexMatcher: matchAll,
+                OriginalPattern: string.Empty);
+        }
+
+        pattern = pattern.Trim();
+        var kind = QueryPatternClassifier.Classify(pattern);
+
+        if (kind == QueryPatternKind.ComplexRegex)
+        {
+            throw new ArgumentException(
+                $"Primary query pattern '{pattern}' contains complex regular expression constructs that cannot be pushed down to SQL. Use the --filter flag for regex post-filtering.",
+                nameof(pattern));
+        }
+
+        if (kind == QueryPatternKind.PureIdentifier)
+        {
+            return Transpile(pattern, columnName, paramPrefix);
+        }
+
+        // GlobPattern: parse AST and emit boundary-preserving SQL
+        if (TryParseAst(pattern, out var ast) && ast is not null)
+        {
+            var parameters = new List<SqliteParameter>();
+            int paramCounter = 0;
+            var sql = EmitSqlClause(ast, columnName, paramPrefix, ref paramCounter, parameters, exactGlobBoundaries: true);
+            if (!string.IsNullOrWhiteSpace(sql))
+            {
+                var regexMatcher = BuildRegexMatcher(ast, pattern, exactGlobBoundaries: true);
+                return new FilterTranspileResult(
+                    IsTranslatable: true,
+                    SqlClause: sql,
+                    Parameters: parameters,
+                    FallbackRegex: null,
+                    RegexMatcher: regexMatcher,
+                    OriginalPattern: pattern);
+            }
+        }
+
+        throw new ArgumentException(
+            $"Primary query pattern '{pattern}' could not be transpiled to a SQL glob expression. Use the --filter flag for regex post-filtering.",
+            nameof(pattern));
+    }
+
+    private static Regex BuildRegexMatcher(FilterNode? ast, string pattern, bool exactGlobBoundaries = false)
     {
         bool hasCharClass = HasCharClassNode(ast);
         var options = hasCharClass
             ? RegexOptions.Compiled
             : RegexOptions.IgnoreCase | RegexOptions.Compiled;
+
+        if (exactGlobBoundaries)
+        {
+            var sb = new StringBuilder();
+            sb.Append('^');
+            BuildRegexFromAst(ast, sb, exactGlobBoundaries: true);
+            sb.Append('$');
+            return new Regex(sb.ToString(), options, RegexTimeout);
+        }
 
         try
         {
@@ -93,7 +162,7 @@ public static class FilterTranspiler
         catch
         {
             var sb = new StringBuilder();
-            BuildRegexFromAst(ast, sb);
+            BuildRegexFromAst(ast, sb, exactGlobBoundaries: false);
             return new Regex(sb.ToString(), options, RegexTimeout);
         }
     }
@@ -116,7 +185,7 @@ public static class FilterTranspiler
         }
     }
 
-    private static void BuildRegexFromAst(FilterNode? node, StringBuilder sb)
+    private static void BuildRegexFromAst(FilterNode? node, StringBuilder sb, bool exactGlobBoundaries = false)
     {
         if (node == null) return;
         switch (node)
@@ -126,17 +195,26 @@ public static class FilterTranspiler
                 for (int i = 0; i < alt.Branches.Count; i++)
                 {
                     if (i > 0) sb.Append('|');
-                    BuildRegexFromAst(alt.Branches[i], sb);
+                    BuildRegexFromAst(alt.Branches[i], sb, exactGlobBoundaries);
                 }
                 sb.Append(')');
                 break;
             case GroupNode grp:
                 sb.Append('(');
-                BuildRegexFromAst(grp.Inner, sb);
+                BuildRegexFromAst(grp.Inner, sb, exactGlobBoundaries);
                 sb.Append(')');
                 break;
             case SequenceNode seq:
-                foreach (var n in seq.Nodes) BuildRegexFromAst(n, sb);
+                bool hasWildcard = seq.Nodes.Any(n => n is MultiCharWildcardNode or SingleCharWildcardNode or CharClassNode);
+                if (exactGlobBoundaries && !hasWildcard)
+                {
+                    sb.Append(".*");
+                }
+                foreach (var n in seq.Nodes) BuildRegexFromAst(n, sb, exactGlobBoundaries);
+                if (exactGlobBoundaries && !hasWildcard)
+                {
+                    sb.Append(".*");
+                }
                 break;
             case LiteralNode lit:
                 sb.Append(Regex.Escape(lit.Value));
@@ -372,7 +450,8 @@ public static class FilterTranspiler
         string columnName,
         string paramPrefix,
         ref int paramCounter,
-        List<SqliteParameter> parameters)
+        List<SqliteParameter> parameters,
+        bool exactGlobBoundaries = false)
     {
         switch (node)
         {
@@ -381,7 +460,7 @@ public static class FilterTranspiler
                 var branchClauses = new List<string>();
                 foreach (var branch in alt.Branches)
                 {
-                    var clause = EmitSqlClause(branch, columnName, paramPrefix, ref paramCounter, parameters);
+                    var clause = EmitSqlClause(branch, columnName, paramPrefix, ref paramCounter, parameters, exactGlobBoundaries);
                     if (!string.IsNullOrWhiteSpace(clause))
                     {
                         branchClauses.Add(clause);
@@ -394,33 +473,33 @@ public static class FilterTranspiler
 
             case GroupNode grp:
             {
-                var innerClause = EmitSqlClause(grp.Inner, columnName, paramPrefix, ref paramCounter, parameters);
+                var innerClause = EmitSqlClause(grp.Inner, columnName, paramPrefix, ref paramCounter, parameters, exactGlobBoundaries);
                 return string.IsNullOrWhiteSpace(innerClause) ? string.Empty : $"({innerClause})";
             }
 
             case SequenceNode seq:
             {
-                return EmitSequenceSql(seq.Nodes, columnName, paramPrefix, ref paramCounter, parameters);
+                return EmitSequenceSql(seq.Nodes, columnName, paramPrefix, ref paramCounter, parameters, exactGlobBoundaries);
             }
 
             case LiteralNode lit:
             {
-                return EmitSequenceSql(new[] { lit }, columnName, paramPrefix, ref paramCounter, parameters);
+                return EmitSequenceSql(new[] { lit }, columnName, paramPrefix, ref paramCounter, parameters, exactGlobBoundaries);
             }
 
             case CharClassNode cc:
             {
-                return EmitSequenceSql(new[] { cc }, columnName, paramPrefix, ref paramCounter, parameters);
+                return EmitSequenceSql(new[] { cc }, columnName, paramPrefix, ref paramCounter, parameters, exactGlobBoundaries);
             }
 
             case SingleCharWildcardNode sc:
             {
-                return EmitSequenceSql(new[] { sc }, columnName, paramPrefix, ref paramCounter, parameters);
+                return EmitSequenceSql(new[] { sc }, columnName, paramPrefix, ref paramCounter, parameters, exactGlobBoundaries);
             }
 
             case MultiCharWildcardNode mc:
             {
-                return EmitSequenceSql(new[] { mc }, columnName, paramPrefix, ref paramCounter, parameters);
+                return EmitSequenceSql(new[] { mc }, columnName, paramPrefix, ref paramCounter, parameters, exactGlobBoundaries);
             }
 
             default:
@@ -433,7 +512,8 @@ public static class FilterTranspiler
         string columnName,
         string paramPrefix,
         ref int paramCounter,
-        List<SqliteParameter> parameters)
+        List<SqliteParameter> parameters,
+        bool exactGlobBoundaries = false)
     {
         bool hasStartAnchor = false;
         bool hasEndAnchor = false;
@@ -460,7 +540,7 @@ public static class FilterTranspiler
             if (n is GroupNode or AlternationNode)
             {
                 // Sub-group within sequence
-                var subClause = EmitSqlClause(n, columnName, paramPrefix, ref paramCounter, parameters);
+                var subClause = EmitSqlClause(n, columnName, paramPrefix, ref paramCounter, parameters, exactGlobBoundaries);
                 return subClause;
             }
             cleanNodes.Add(n);
@@ -471,11 +551,16 @@ public static class FilterTranspiler
             return string.Empty;
         }
 
-        // If it contains a character class, translate to SQLite GLOB
-        if (hasCharClass)
+        bool hasWildcard = cleanNodes.Any(n => n is MultiCharWildcardNode or SingleCharWildcardNode);
+
+        // If it contains a character class or explicit glob wildcards with exact boundaries, use SQLite GLOB
+        if (hasCharClass || (exactGlobBoundaries && hasWildcard))
         {
             var globPattern = new StringBuilder();
-            if (!hasStartAnchor && cleanNodes[0] is not MultiCharWildcardNode) globPattern.Append('*');
+            if (!exactGlobBoundaries && !hasStartAnchor && cleanNodes[0] is not MultiCharWildcardNode)
+            {
+                globPattern.Append('*');
+            }
 
             foreach (var n in cleanNodes)
             {
@@ -496,7 +581,10 @@ public static class FilterTranspiler
                 }
             }
 
-            if (!hasEndAnchor && cleanNodes[^1] is not MultiCharWildcardNode) globPattern.Append('*');
+            if (!exactGlobBoundaries && !hasEndAnchor && cleanNodes[^1] is not MultiCharWildcardNode)
+            {
+                globPattern.Append('*');
+            }
 
             string paramName = $"@{paramPrefix}{paramCounter++}";
             parameters.Add(new SqliteParameter(paramName, globPattern.ToString()));
@@ -506,7 +594,10 @@ public static class FilterTranspiler
         {
             // Translate to SQLite LIKE ... ESCAPE '\' COLLATE NOCASE
             var likePattern = new StringBuilder();
-            if (!hasStartAnchor && cleanNodes[0] is not MultiCharWildcardNode) likePattern.Append('%');
+            bool shouldPrependPercent = !hasStartAnchor && cleanNodes[0] is not MultiCharWildcardNode;
+            if (exactGlobBoundaries && hasWildcard) shouldPrependPercent = false;
+
+            if (shouldPrependPercent) likePattern.Append('%');
 
             foreach (var n in cleanNodes)
             {
@@ -531,7 +622,10 @@ public static class FilterTranspiler
                 }
             }
 
-            if (!hasEndAnchor && cleanNodes[^1] is not MultiCharWildcardNode) likePattern.Append('%');
+            bool shouldAppendPercent = !hasEndAnchor && cleanNodes[^1] is not MultiCharWildcardNode;
+            if (exactGlobBoundaries && hasWildcard) shouldAppendPercent = false;
+
+            if (shouldAppendPercent) likePattern.Append('%');
 
             string paramName = $"@{paramPrefix}{paramCounter++}";
             parameters.Add(new SqliteParameter(paramName, likePattern.ToString()));

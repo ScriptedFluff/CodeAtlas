@@ -51,14 +51,14 @@ public sealed class IndexOrchestrator
 
         if (!Directory.Exists(repoPath))
         {
-            Console.WriteLine($"[IndexOrchestrator] Warning: Directory '{repoPath}' does not exist.");
+            Console.Error.WriteLine($"[IndexOrchestrator] Warning: Directory '{repoPath}' does not exist.");
             return new IndexResult(0, 0, 0);
         }
 
         var config = CodeGraphMcp.Config.AppConfig.Load(repoPath);
         if (config.WildcardIgnoreAll)
         {
-            Console.WriteLine("[IndexOrchestrator] Warning: Ignore configuration contains wildcard '*' — all files have been filtered out.");
+            Console.Error.WriteLine("[IndexOrchestrator] Warning: Ignore configuration contains wildcard '*' — all files have been filtered out.");
             logger?.LogWarning("Ignore configuration contains wildcard '*' — all files in {RepoPath} are filtered out.", repoPath);
         }
 
@@ -66,7 +66,7 @@ public sealed class IndexOrchestrator
 
         if (files.Count == 0 && config.WildcardIgnoreAll)
         {
-            Console.WriteLine("[IndexOrchestrator] Notice: 0 files indexed because 'Ignore' pattern '*' filtered out all repository files.");
+            Console.Error.WriteLine("[IndexOrchestrator] Notice: 0 files indexed because 'Ignore' pattern '*' filtered out all repository files.");
         }
 
         logger?.LogInformation("Found {FileCount} files to process in {RepoPath} (noIgnore: {NoIgnore})", files.Count, repoPath, noIgnore);

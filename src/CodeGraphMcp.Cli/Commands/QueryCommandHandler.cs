@@ -202,11 +202,30 @@ public static class QueryCommandHandler
         var parsedType = Enum.TryParse<SymbolType>(typeOpt, true, out var st) ? st : (SymbolType?)null;
 
         // Determine effective pattern
-        var effectivePattern = !string.IsNullOrWhiteSpace(filterPattern)
-            ? filterPattern
-            : (!string.IsNullOrWhiteSpace(symbolArg) ? symbolArg : null);
-
-        var transpileResult = FilterTranspiler.Transpile(effectivePattern);
+        FilterTranspileResult transpileResult;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(filterPattern))
+            {
+                transpileResult = FilterTranspiler.Transpile(filterPattern);
+            }
+            else if (!string.IsNullOrWhiteSpace(symbolArg))
+            {
+                var kind = QueryPatternClassifier.Classify(symbolArg);
+                transpileResult = kind == QueryPatternKind.PureIdentifier
+                    ? FilterTranspiler.Transpile(symbolArg)
+                    : FilterTranspiler.TranspilePrimaryQuery(symbolArg);
+            }
+            else
+            {
+                transpileResult = FilterTranspiler.Transpile(null);
+            }
+        }
+        catch (ArgumentException ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return;
+        }
 
         var effectiveLimit = limitVal <= 0 ? 500 : limitVal;
 
@@ -281,7 +300,7 @@ public static class QueryCommandHandler
         {
             var response = new QueryFilterCliResponse(
                 RepoPath: repoRoot,
-                Filter: effectivePattern,
+                Filter: transpileResult.OriginalPattern,
                 TranspiledToSql: transpileResult.IsTranslatable,
                 TotalReturned: mergedList.Count,
                 HasMore: dbResult.HasMore,
@@ -294,7 +313,7 @@ public static class QueryCommandHandler
 
         if (mergedList.Count == 0)
         {
-            var desc = effectivePattern is not null ? $" matching '{effectivePattern}'" : "";
+            var desc = !string.IsNullOrWhiteSpace(transpileResult.OriginalPattern) ? $" matching '{transpileResult.OriginalPattern}'" : "";
             Console.WriteLine($"No symbols found{desc}.");
             return;
         }
