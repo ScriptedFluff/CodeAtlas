@@ -1,6 +1,6 @@
-# CodeGraphMcp — Developer Technical Specification & Command Architecture
+﻿# CodeAtlas — Developer Technical Specification & Command Architecture
 
-`CodeGraphMcp` is a high-performance local code knowledge graph indexer, reference graph analysis engine, and Model Context Protocol (MCP) server designed for software architects and senior engineers. It parses multi-language source trees (C#, TypeScript, JavaScript, HTML, PowerShell), extracts syntax trees into relational SQLite graphs, tracks Git deltas for sub-second incremental indexing, performs cross-stack ServiceStack DTO linkage, and surfaces dirty uncommitted file modifications live to AI coding assistants.
+`CodeAtlas` is a high-performance local code knowledge graph indexer, reference graph analysis engine, and Model Context Protocol (MCP) server designed for software architects and senior engineers. It parses multi-language source trees (C#, TypeScript, JavaScript, HTML, PowerShell), extracts syntax trees into relational SQLite graphs, tracks Git deltas for sub-second incremental indexing, performs cross-stack ServiceStack DTO linkage, and surfaces dirty uncommitted file modifications live to AI coding assistants.
 
 ---
 
@@ -40,20 +40,20 @@
 
 ### Core Architecture Components
 
-1. **AST Parsing Pipeline (`CodeGraphMcp.Parser`)**:
+1. **AST Parsing Pipeline (`CodeAtlas.Parser`)**:
    - **C#**: Roslyn-backed syntax walker extracting classes, interfaces, structs, enums, methods, properties, and invocation expressions.
    - **TypeScript/JavaScript**: Tree-sitter / custom AST lexer extracting functions, classes, exports, interfaces, and call graphs.
    - **HTML**: DOM node scanner indexing element IDs, component tags, and input controls.
    - **PowerShell**: Abstract Syntax Tree (`System.Management.Automation.Language`) visitor extracting functions, parameters, and invocation chains.
-2. **Git Delta Tracker (`CodeGraphMcp.Git`)**:
+2. **Git Delta Tracker (`CodeAtlas.Core.Git`)**:
    - Interrogates `git diff` against saved index commit hash (`last_indexed_commit`).
    - Limits re-indexing to modified, added, or deleted files, avoiding full re-scans.
-3. **Relational Knowledge Graph (`CodeGraphMcp.Db`)**:
+3. **Relational Knowledge Graph (`CodeAtlas.Core.Db`)**:
    - SQLite engine operating with Write-Ahead Logging (`WAL` mode) and pragma optimizations via `Dapper`.
    - Indexed tables for `files`, `symbols`, `references`, and `dto_mappings`.
 4. **Live Dirty Buffer Interceptor**:
    - When executing symbol or reference queries via MCP or CLI, uncommitted edits on disk override stale SQLite records in memory for zero-latency accuracy.
-5. **Model Context Protocol Server (`CodeGraphMcp.Mcp`)**:
+5. **Model Context Protocol Server (`CodeAtlas.Mcp`)**:
    - Implements JSON-RPC 2.0 over standard I/O streams (`stdio`).
    - Exposes specialized knowledge graph tools directly to LLMs (Claude, AGY/Antigravity, Cursor, Copilot).
 
@@ -76,13 +76,13 @@ Parses, indexes, and builds symbol/reference graphs for a target repository.
 #### Examples:
 ```powershell
 # Standard local repository index
-CodeGraphMcp index "D:\Projects\C#\CodeGraphMcp" --store-local
+CodeAtlas index "D:\Projects\C#\CodeAtlas" --store-local
 
 # Force complete re-index overriding git deltas and ignore rules
-CodeGraphMcp index "C:\Services\PaymentGateway" --store-local --force-full --no-ignore
+CodeAtlas index "C:\Services\PaymentGateway" --store-local --force-full --no-ignore
 
 # Store index in custom central path
-CodeGraphMcp index "C:\Repo" --db-dir "C:\SharedIndexes\RepoDb"
+CodeAtlas index "C:\Repo" --db-dir "C:\SharedIndexes\RepoDb"
 ```
 
 ---
@@ -100,10 +100,10 @@ Searches for symbol definitions, signatures, line boundaries, and source code di
 #### Examples:
 ```powershell
 # Query symbol definition within the local directory
-CodeGraphMcp query "IndexOrchestrator" --store-local
+CodeAtlas query "IndexOrchestrator" --store-local
 
 # Query specific project repository from an external directory
-CodeGraphMcp query "PaymentProcessor" --repo "D:\Projects\Services\Billing" --store-local
+CodeAtlas query "PaymentProcessor" --repo "D:\Projects\Services\Billing" --store-local
 ```
 
 ---
@@ -119,7 +119,7 @@ Reports current repository health, branch info, committed vs. indexed state, and
 #### Examples:
 ```powershell
 # Inspect repository index status
-CodeGraphMcp status "D:\Projects\C#\CodeGraphMcp" --store-local
+CodeAtlas status "D:\Projects\C#\CodeAtlas" --store-local
 ```
 
 ---
@@ -136,7 +136,7 @@ Runs a background daemon polling Git commit state and updating the index upon co
 #### Examples:
 ```powershell
 # Watch repository with 15-second polling loop
-CodeGraphMcp watch "D:\Projects\C#\CodeGraphMcp" --store-local --interval 15
+CodeAtlas watch "D:\Projects\C#\CodeAtlas" --store-local --interval 15
 ```
 
 ---
@@ -153,7 +153,7 @@ Purges SQLite databases and WAL journal files associated with the repository.
 #### Examples:
 ```powershell
 # Purge local repository index database silently
-CodeGraphMcp clean "D:\Projects\C#\CodeGraphMcp" --store-local --yes
+CodeAtlas clean "D:\Projects\C#\CodeAtlas" --store-local --yes
 ```
 
 ---
@@ -170,10 +170,10 @@ Launches the Model Context Protocol (MCP) server over `stdio` for AI tool integr
 #### Examples:
 ```powershell
 # Launch unbound dynamic MCP server
-CodeGraphMcp serve
+CodeAtlas serve
 
 # Launch repository-bound MCP server using local index
-CodeGraphMcp serve --repo "D:\Projects\C#\CodeGraphMcp" --store-local
+CodeAtlas serve --repo "D:\Projects\C#\CodeAtlas" --store-local
 ```
 
 ---
@@ -187,7 +187,7 @@ Before renaming or refactoring core methods, developers can use `get_diff_impact
 Tracing how C# backend Request/Response DTO contracts bind to TypeScript interfaces and Angular frontend components.
 
 ### Use Case C: Live Uncommitted Editing Verification
-When editing files in an IDE, AI agents query the MCP server. `CodeGraphMcp` reads the dirty file buffer directly from disk, delivering up-to-the-second symbol line ranges even before saving to disk.
+When editing files in an IDE, AI agents query the MCP server. `CodeAtlas` reads the dirty file buffer directly from disk, delivering up-to-the-second symbol line ranges even before saving to disk.
 
 ---
 
@@ -205,7 +205,7 @@ When editing files in an IDE, AI agents query the MCP server. `CodeGraphMcp` rea
 
 ## 5. Local Inter-Agent Relay Service Architecture
 
-`CodeGraphMcp` includes a localized HTTP daemon (`scripts/relay/`) enabling real-time communication between decoupled AI agents (e.g. Antigravity/AGY and GitHub Copilot).
+`CodeAtlas` includes a localized HTTP daemon (`scripts/relay/`) enabling real-time communication between decoupled AI agents (e.g. Antigravity/AGY and GitHub Copilot).
 
 - **Port**: `http://localhost:9123`
 - **Endpoints**:

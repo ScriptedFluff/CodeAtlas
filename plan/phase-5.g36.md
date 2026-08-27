@@ -1,4 +1,4 @@
-# Phase 5 Implementation Plan: Other Thoughts & Notes
+﻿# Phase 5 Implementation Plan: Other Thoughts & Notes
 
 Phase 5 addresses foundational performance, accuracy, and extensibility improvements identified during codebase analysis. This plan outlines the technical design, priority sequence, file modifications, and verification steps for implementing `.gitignore` support, C# multi-file partial class handling, JavaScript language support, and a modular parser architecture.
 
@@ -43,30 +43,30 @@ Based on system impact and integration fit with Phase 4 (Reference Graph, File W
 
 ### Component 1: `.gitignore` Integration (`GitIgnoreMatcher` & `IndexOrchestrator`)
 
-#### [NEW] [GitIgnoreMatcher.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Git/GitIgnoreMatcher.cs)
+#### [NEW] [GitIgnoreMatcher.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Git/GitIgnoreMatcher.cs)
 - Implement `.gitignore` parser supporting standard gitignore pattern rules (`*`, `**`, `?`, `/`, `!`).
 - Support loading root `.gitignore` as well as nested `.gitignore` files found during directory traversal.
 - Expose `bool IsIgnored(string relativeOrAbsolutePath)` method.
 
-#### [MODIFY] [IndexOrchestrator.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Indexer/IndexOrchestrator.cs)
+#### [MODIFY] [IndexOrchestrator.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Indexer/IndexOrchestrator.cs)
 - Replace static `IgnoredDirs` check in `EnumerateFiles` with dynamic `GitIgnoreMatcher`.
 - Ensure ignored directories (such as `bin`, `obj`, `node_modules`, `.git`, `.agent-index`) are pruned early during directory recursion.
 
-#### [MODIFY] [FileWatcher.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Indexer/FileWatcher.cs)
+#### [MODIFY] [FileWatcher.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Indexer/FileWatcher.cs)
 - Check `GitIgnoreMatcher.IsIgnored(path)` before enqueuing file system change notifications to eliminate noise.
 
 ---
 
 ### Component 2: Language-Agnostic Multi-File Symbol Declaration Merging
 
-#### [MODIFY] [ILanguageParser.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Parser/ILanguageParser.cs) / Symbol Metadata
+#### [MODIFY] [ILanguageParser.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Parser/ILanguageParser.cs) / Symbol Metadata
 - Introduce language-agnostic metadata on extracted `Symbol`s indicating declaration traits (e.g. `IsPartial` / `IsDeclarationMergeable`).
 
-#### [MODIFY] [CSharpParser.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Parser/CSharpParser.cs) & [TypeScriptParser.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Parser/TypeScriptParser.cs)
+#### [MODIFY] [CSharpParser.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Parser/CSharpParser.cs) & [TypeScriptParser.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Parser/TypeScriptParser.cs)
 - C#: Detect `partial` modifier on `class`, `struct`, `interface`, and `record` declarations across multiple files.
 - TypeScript / JS: Detect multi-file declaration merging constructs (e.g. `interface`, `namespace`, type augmentation across files).
 
-#### [MODIFY] [SymbolDb.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Db/SymbolDb.cs)
+#### [MODIFY] [SymbolDb.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Db/SymbolDb.cs)
 - Generalize database storage and lookup logic (`UpsertFile`, `ResolveId`, `GetPrimarySymbolIdForFile`) so multi-file declarations with identical fully-qualified names aggregate member definitions and locations across files without overwriting each other.
 - Support multi-location resolution so reference graph lookups resolve caller/callee definitions across all merged declaration sites.
 
@@ -74,22 +74,22 @@ Based on system impact and integration fit with Phase 4 (Reference Graph, File W
 
 ### Component 3: JavaScript Support (`JavaScriptParser`)
 
-#### [NEW] [JavaScriptParser.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Parser/JavaScriptParser.cs)
+#### [NEW] [JavaScriptParser.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Parser/JavaScriptParser.cs)
 - Implement `ILanguageParser` handling `.js`, `.jsx`, `.mjs`, `.cjs`.
 - Share/reuse Tree-Sitter parsing logic with `TypeScriptParser` for AST node extraction (functions, classes, exports, imports, calls).
 
-#### [MODIFY] [IndexOrchestrator.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Indexer/IndexOrchestrator.cs)
+#### [MODIFY] [IndexOrchestrator.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Indexer/IndexOrchestrator.cs)
 - Register `JavaScriptParser` in `BuildExtensionMap()`.
 
 ---
 
 ### Component 4: Modular / Drop-in Parser Architecture
 
-#### [NEW] [ParserRegistry.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Parser/ParserRegistry.cs)
+#### [NEW] [ParserRegistry.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Parser/ParserRegistry.cs)
 - Create dynamic registry `IParserRegistry` to register, resolve, and list installed `ILanguageParser` instances.
 - Support plugin/loader extensibility by decoupling language parser registration from hardcoded `IndexOrchestrator` arrays.
 
-#### [MODIFY] [ILanguageParser.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Parser/ILanguageParser.cs)
+#### [MODIFY] [ILanguageParser.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Parser/ILanguageParser.cs)
 - Add parser metadata properties (e.g., `DisplayName`, `Version`, `Capabilities`) to facilitate modular discovery.
 
 ---
@@ -110,4 +110,4 @@ Based on system impact and integration fit with Phase 4 (Reference Graph, File W
 
 ### Manual Verification
 - Run `dotnet test` across the full solution.
-- Run `CodeGraphMcp` indexer on a sample repository containing `.gitignore`, C# partial classes, and JS files, verifying database output with `sqlite3` CLI or diagnostic queries.
+- Run `CodeAtlas` indexer on a sample repository containing `.gitignore`, C# partial classes, and JS files, verifying database output with `sqlite3` CLI or diagnostic queries.

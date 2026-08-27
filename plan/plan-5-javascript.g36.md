@@ -1,6 +1,6 @@
-# Phase 5-3 Implementation Plan: JavaScript Support
+﻿# Phase 5-3 Implementation Plan: JavaScript Support
 
-Phase 5-3 extends CodeGraphMcp's multi-language parsing capability by introducing full JavaScript support across standard JS (`.js`), React JSX (`.jsx`), ES Modules (`.mjs`), and CommonJS (`.cjs`) source files.
+Phase 5-3 extends CodeAtlas's multi-language parsing capability by introducing full JavaScript support across standard JS (`.js`), React JSX (`.jsx`), ES Modules (`.mjs`), and CommonJS (`.cjs`) source files.
 
 ---
 
@@ -31,7 +31,7 @@ Phase 5-3 extends CodeGraphMcp's multi-language parsing capability by introducin
 
 ### Component 1: `JavaScriptParser` Implementation
 
-#### [NEW] [JavaScriptParser.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Parser/JavaScriptParser.cs)
+#### [NEW] [JavaScriptParser.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Parser/JavaScriptParser.cs)
 - Implement `ILanguageParser` interface for JavaScript.
 - Define `FileExtensions => [".js", ".jsx", ".mjs", ".cjs"]`.
 - Define `Language => "javascript"`.
@@ -55,7 +55,7 @@ Phase 5-3 extends CodeGraphMcp's multi-language parsing capability by introducin
 
 ### Component 2: Indexer Orchestration Integration
 
-#### [MODIFY] [IndexOrchestrator.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Indexer/IndexOrchestrator.cs)
+#### [MODIFY] [IndexOrchestrator.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Indexer/IndexOrchestrator.cs)
 - Add `new JavaScriptParser()` to `BuildExtensionMap()`.
 - Automatically route `.js`, `.jsx`, `.mjs`, and `.cjs` files through `JavaScriptParser`.
 
@@ -63,7 +63,7 @@ Phase 5-3 extends CodeGraphMcp's multi-language parsing capability by introducin
 
 ### Component 3: Test Suite
 
-#### [NEW] [JavaScriptParserTests.cs](file:///d:/Projects/C%23/CodeGraphMcp/tests/CodeGraphMcp.Tests/JavaScriptParserTests.cs)
+#### [NEW] [JavaScriptParserTests.cs](file:///d:/Projects/C%23/CodeAtlas/tests/CodeAtlas.Tests/JavaScriptParserTests.cs)
 - Unit tests covering:
   1. **Standard Function & Class Parsing**: Verifies parsing of classes, methods, standard functions, and arrow functions in `.js` files.
   2. **React JSX Component Parsing**: Verifies parsing of JSX elements and functional components in `.jsx` files.
@@ -78,7 +78,7 @@ Phase 5-3 extends CodeGraphMcp's multi-language parsing capability by introducin
 ### Automated Tests
 - Run unit tests via dotnet CLI:
   ```powershell
-  dotnet test tests/CodeGraphMcp.Tests/CodeGraphMcp.Tests.csproj --filter "FullyQualifiedName~JavaScriptParserTests"
+  dotnet test tests/CodeAtlas.Tests/CodeAtlas.Tests.csproj --filter "FullyQualifiedName~JavaScriptParserTests"
   ```
 - Run full unit test suite:
   ```powershell
@@ -86,5 +86,5 @@ Phase 5-3 extends CodeGraphMcp's multi-language parsing capability by introducin
   ```
 
 ### Manual Verification
-- Index a repository containing JavaScript & React JSX files using `CodeGraphMcp`.
+- Index a repository containing JavaScript & React JSX files using `CodeAtlas`.
 - Verify database entries in `symbols` and `symbol_references` tables for JavaScript symbols.

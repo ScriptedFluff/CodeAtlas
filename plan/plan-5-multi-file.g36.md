@@ -1,4 +1,4 @@
-# Dedicated Implementation Plan: Multi-File Symbol Declaration Merging
+﻿# Dedicated Implementation Plan: Multi-File Symbol Declaration Merging
 
 This plan specifically details the architecture, data models, parser changes, database queries, and verification strategy for handling **multi-file symbol declarations** (such as C# `partial` classes/interfaces/structs/records and TypeScript/JavaScript `interface`/`namespace` declaration merging).
 
@@ -92,29 +92,29 @@ Update `ResolveId` to handle partial declaration scopes:
 ## Proposed Changes & File Checklist
 
 ### Data Models & DB
-- 📄 [MODIFY] [Symbol.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Models/Symbol.cs)
+- 📄 [MODIFY] [Symbol.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Models/Symbol.cs)
   - Add `IsPartial` boolean property.
-- 📄 [MODIFY] [MigrationRunner.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Db/MigrationRunner.cs)
+- 📄 [MODIFY] [MigrationRunner.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Db/MigrationRunner.cs)
   - Add SQLite migration step for `is_partial` column in `symbols` table.
 
 ### Parsers
-- 📄 [MODIFY] [CSharpParser.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Parser/CSharpParser.cs)
+- 📄 [MODIFY] [CSharpParser.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Parser/CSharpParser.cs)
   - Detect `partial` modifier on class, struct, interface, and record syntax nodes.
-- 📄 [MODIFY] [TypeScriptParser.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Parser/TypeScriptParser.cs)
+- 📄 [MODIFY] [TypeScriptParser.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Parser/TypeScriptParser.cs)
   - Detect merged `interface` and `namespace` AST nodes.
 
 ### DB Queries & Indexer
-- 📄 [MODIFY] [SymbolQueries.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Db/Queries/SymbolQueries.cs)
+- 📄 [MODIFY] [SymbolQueries.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Db/Queries/SymbolQueries.cs)
   - Update `UpsertFile` to write `is_partial`.
   - Update `ResolveId` and `FindByName` to return aggregated member definitions across partial file declarations.
-- 📄 [MODIFY] [ReferenceQueries.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Db/Queries/ReferenceQueries.cs)
+- 📄 [MODIFY] [ReferenceQueries.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Db/Queries/ReferenceQueries.cs)
   - Ensure cross-file caller lookups resolve methods contained within partial classes declared across multiple files.
 
 ---
 
 ## Verification & Test Plan
 
-### Automated Unit & Integration Tests (`tests/CodeGraphMcp.Tests/`)
+### Automated Unit & Integration Tests (`tests/CodeAtlas.Tests/`)
 1. **C# Partial Class Test**:
    - Create mock files `User.cs` (declaring `partial class User { void MethodA(); }`) and `User.Extended.cs` (declaring `partial class User { void MethodB(); }`).
    - Run `CSharpParser` on both files and verify both set `IsPartial = true`.

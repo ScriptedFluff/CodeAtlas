@@ -1,4 +1,4 @@
-# Implementation Plan — WATCH-01 (FileSystemWatcher for Live MCP Sessions)
+﻿# Implementation Plan — WATCH-01 (FileSystemWatcher for Live MCP Sessions)
 
 Keep the live `DirtyFileBuffer` automatically synchronized when files are created, modified, or deleted during long-running MCP server sessions.
 
@@ -33,11 +33,11 @@ Runtime:   [OS File System Event]  ---> FileWatcher  ---> DirtyFileBuffer.Update
 
 ## Proposed Changes
 
-### Core Engine (`CodeGraphMcp`)
+### Core Engine (`CodeAtlas`)
 
 ---
 
-#### [NEW] [FileWatcher.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Git/FileWatcher.cs)
+#### [NEW] [FileWatcher.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Git/FileWatcher.cs)
 - Create `FileWatcher` class wrapping `FileSystemWatcher`.
 - Subscribes to `Changed`, `Created`, `Deleted`, and `Renamed` events on the repository path.
 - Filters events by supported parser extensions (`.cs`, `.ts`, `.tsx`, `.js`, `.jsx`, `.html`, `.htm`, `.ps1`, `.psm1`, `.psd1`) and ignores blacklisted directories (`.git`, `.agent-index`, `bin`, `obj`, `publish`, `node_modules`, `dist`, `.next`, `coverage`, `.vs`).
@@ -45,16 +45,16 @@ Runtime:   [OS File System Event]  ---> FileWatcher  ---> DirtyFileBuffer.Update
 - Updates `DirtyFileBuffer` via `UpdateFile(relPath)` for modifications/creations and `Invalidate(relPath)` for deletions/renames.
 - Implements `IDisposable` to stop watching and cancel pending timer tasks.
 
-#### [MODIFY] [McpServer.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Mcp/McpServer.cs)
+#### [MODIFY] [McpServer.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Mcp/McpServer.cs)
 - Instantiate `FileWatcher` in `McpServer.RunAsync` after eager pre-warming of `DirtyFileBuffer`.
 - Call `watcher.Start()`.
 - Ensure `FileWatcher` is disposed when `McpServer.RunAsync` finishes / cancels.
 
-### Test Suite (`CodeGraphMcp.Tests`)
+### Test Suite (`CodeAtlas.Tests`)
 
 ---
 
-#### [NEW] [FileWatcherTests.cs](file:///d:/Projects/C%23/CodeGraphMcp/tests/CodeGraphMcp.Tests/Git/FileWatcherTests.cs)
+#### [NEW] [FileWatcherTests.cs](file:///d:/Projects/C%23/CodeAtlas/tests/CodeAtlas.Tests/Git/FileWatcherTests.cs)
 - `FileWatcher_FileCreated_UpdatesDirtyBuffer`: Verify creating a new source file populates dirty buffer after debounce delay.
 - `FileWatcher_FileDeleted_InvalidatesDirtyBuffer`: Verify deleting a file removes it from dirty buffer.
 - `FileWatcher_IgnoredDirectory_DoesNotUpdateBuffer`: Verify edits inside ignored directories (e.g. `bin/`, `.git/`) are ignored.
@@ -67,6 +67,6 @@ Runtime:   [OS File System Event]  ---> FileWatcher  ---> DirtyFileBuffer.Update
 - All unit tests (including new `FileWatcherTests`) must pass cleanly.
 
 ### Manual Verification
-1. Run `dotnet build src\CodeGraphMcp` to ensure clean build.
+1. Run `dotnet build src\CodeAtlas` to ensure clean build.
 2. Start MCP server against a test repo path.
 3. Modify a source file on disk and verify live queries reflect the updated symbols without restarting the server.

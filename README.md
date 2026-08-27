@@ -1,4 +1,4 @@
-# CodeGraphMcp 🚀
+# CodeAtlas 🚀
 
 [![.NET 10.0](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Native AOT](https://img.shields.io/badge/Compile-Native_AOT-007ACC?logo=visualstudio)](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/)
@@ -6,13 +6,16 @@
 
 > **Local high-performance code knowledge graph indexer & query engine providing sub-100ms symbol lookups, caller reference graphs, git blast-radius impact analysis, and ServiceStack cross-stack DTO contracts for AI coding assistants.**
 
+> [!NOTE]
+> **Project Renamed**: Formerly known as **CodeGraphMcp**, the project has been renamed to **CodeAtlas** to reflect its broader role as a standalone, ultra-fast structural code indexer and knowledge oracle. The MCP server is now packaged as a dedicated sub-project (`CodeAtlas.Mcp`), while the core engine and CLI (`CodeAtlas.Cli` / `atlas`) operate independently.
+
 ---
 
 ## 🎯 Overview & Goals
 
-`CodeGraphMcp` bridges the gap between massive local codebases (80+ C# microservices, Angular/TypeScript apps, configurations, and scripts) and AI assistants (Antigravity, GitHub Copilot, Claude Desktop, Cursor). 
+`CodeAtlas` bridges the gap between massive local codebases (80+ C# microservices, Angular/TypeScript apps, configurations, and scripts) and AI assistants (Antigravity, GitHub Copilot, Claude Desktop, Cursor). 
 
-Instead of forcing AI agents to repeatedly scan file trees or spend context window tokens loading full 1,000+ line files, `CodeGraphMcp` maintains a lightweight, incremental SQLite index of your codebase AST symbols. AI models query exact symbol locations, signatures, caller chains, and precise line ranges (`StartLine` – `EndLine`) in **sub-100ms**.
+Instead of forcing AI agents to repeatedly scan file trees or spend context window tokens loading full 1,000+ line files, `CodeAtlas` maintains a lightweight, incremental SQLite index of your codebase AST symbols. AI models query exact symbol locations, signatures, caller chains, and precise line ranges (`StartLine` – `EndLine`) in **sub-100ms**.
 
 ### Core Goals
 - ⚡ **Sub-100ms Warm Queries**: 17x faster than disk-scanning tools like PowerShell `Select-String` or `Get-ChildItem`.
@@ -23,26 +26,26 @@ Instead of forcing AI agents to repeatedly scan file trees or spend context wind
 
 ---
 
-## ⚡ Why CodeGraphMcp Is Better Than Other Code-Graph MCP Servers
+## ⚡ Why CodeAtlas Is Better Than Other Code-Graph MCP Servers
 
-CodeGraphMcp is fundamentally different from other code-graph MCP servers. Most existing tools in this space are Python-based, slow, language-limited, and often assembled through AI-generated code rather than engineered. CodeGraphMcp is a native, high-performance, multi-language semantic indexer built for real engineering workflows and fast AI command-chains.
+CodeAtlas is fundamentally different from other code-graph MCP servers. Most existing tools in this space are Python-based, slow, language-limited, and often assembled through AI-generated code rather than engineered. CodeAtlas is a native, high-performance, multi-language semantic indexer built for real engineering workflows and fast AI command-chains.
 
 ### 🚀 10–20x Faster Execution (50–100ms Queries)
-Unlike Python MCP servers, which typically respond in 300–2000ms, CodeGraphMcp consistently delivers 50–100ms warm queries. This makes it 10–20x faster than alternatives and allows AI assistants to chain multiple commands without latency buildup. Slow MCP servers cause AI to stall, retry, hallucinate, or lose context. CodeGraphMcp avoids all of this by being engineered for speed, not prototyped for convenience.
+Unlike Python MCP servers, which typically respond in 300–2000ms, CodeAtlas consistently delivers 50–100ms warm queries. This makes it 10–20x faster than alternatives and allows AI assistants to chain multiple commands without latency buildup. Slow MCP servers cause AI to stall, retry, hallucinate, or lose context. CodeAtlas avoids all of this by being engineered for speed, not prototyped for convenience.
 
 ### ⚡ Native AOT .NET 10
-CodeGraphMcp uses Native AOT .NET 10, giving it compiled performance, multi-threading, and predictable memory behavior. Python tools suffer from GIL contention, slow AST traversal, slow JSON serialization, and runtime overhead. CodeGraphMcp avoids these bottlenecks entirely.
+CodeAtlas uses Native AOT .NET 10, giving it compiled performance, multi-threading, and predictable memory behavior. Python tools suffer from GIL contention, slow AST traversal, slow JSON serialization, and runtime overhead. CodeAtlas avoids these bottlenecks entirely.
 
 ### 🌐 True Multi-Language & Cross-Stack Visibility
-CodeGraphMcp indexes C#, TypeScript, JavaScript, HTML, XML, JSON, YAML, CSS, and PowerShell. Python alternatives are almost always language-specific and cannot build a unified cross-stack graph. CodeGraphMcp links C# DTOs to TypeScript interfaces and Angular components, providing full-stack visibility that no other MCP server offers.
+CodeAtlas indexes C#, TypeScript, JavaScript, HTML, XML, JSON, YAML, CSS, and PowerShell. Python alternatives are almost always language-specific and cannot build a unified cross-stack graph. CodeAtlas links C# DTOs to TypeScript interfaces and Angular components, providing full-stack visibility that no other MCP server offers.
 
 ### 🔄 Incremental SQLite Index & Live Dirty Buffer Awareness
-CodeGraphMcp maintains an incremental SQLite index and merges dirty buffers, meaning unsaved changes are searchable immediately. Python tools typically rescan the filesystem on every query, causing slowdowns and inconsistent results. CodeGraphMcp performs diff-aware updates, partial reindexing, and blast-radius analysis for safe refactoring.
+CodeAtlas maintains an incremental SQLite index and merges dirty buffers, meaning unsaved changes are searchable immediately. Python tools typically rescan the filesystem on every query, causing slowdowns and inconsistent results. CodeAtlas performs diff-aware updates, partial reindexing, and blast-radius analysis for safe refactoring.
 
 ### 🧠 AI Context Budget Protection
-CodeGraphMcp protects AI context budgets by returning exact line ranges for symbols instead of dumping entire files. This reduces token usage, improves accuracy, and prevents hallucinations. Python alternatives often send full files or large chunks of text, wasting tokens and increasing cost.
+CodeAtlas protects AI context budgets by returning exact line ranges for symbols instead of dumping entire files. This reduces token usage, improves accuracy, and prevents hallucinations. Python alternatives often send full files or large chunks of text, wasting tokens and increasing cost.
 
-> **In short**: CodeGraphMcp is the only fast, multi-language, engineered, semantic, incremental, diff-aware, dirty-buffer-aware, cross-stack code-graph MCP server available today. All alternatives are Python, slow, language-limited, and unsuitable for high-performance AI workflows. CodeGraphMcp is built for real developers and real AI assistants, delivering sub-100ms responses and production-grade reliability.
+> **In short**: CodeAtlas is the only fast, multi-language, engineered, semantic, incremental, diff-aware, dirty-buffer-aware, cross-stack code-graph MCP server available today. All alternatives are Python, slow, language-limited, and unsuitable for high-performance AI workflows. CodeAtlas is built for real developers and real AI assistants, delivering sub-100ms responses and production-grade reliability.
 
 ---
 
@@ -68,22 +71,22 @@ CodeGraphMcp protects AI context budgets by returning exact line ranges for symb
 ### 2. Build & Publish Release Executables
 ```powershell
 # Clone the repository
-git clone https://github.com/ScriptedFluff/CodeGraphMcp.git
-cd CodeGraphMcp
+git clone https://github.com/ScriptedFluff/CodeAtlas.git
+cd CodeAtlas
 
 # Publish Server daemon, CLI utility, and all 8 drop-in parser plugins
 pwsh -File ./scripts/publish.ps1
 ```
 The compiled executables and plugins will be located at:
-- MCP Daemon Server: `.\publish\server\CodeGraphMcp.Server.exe`
-- CLI Utility: `.\publish\cli\CodeGraphMcp.Cli.exe`
+- MCP Daemon Server: `.\publish\server\CodeAtlas.Mcp.exe`
+- CLI Utility: `.\publish\cli\CodeAtlas.Cli.exe`
 - Drop-in Plugins: `.\publish\server\Parsers\` and `.\publish\cli\Parsers\`
 
 ---
 
 ## 🧩 Modular / Drop-in Parser Architecture
 
-`CodeGraphMcp` features a decoupled drop-in plugin architecture. Every language parser is an independent DLL loaded into an isolated, collectible `AssemblyLoadContext`:
+`CodeAtlas` features a decoupled drop-in plugin architecture. Every language parser is an independent DLL loaded into an isolated, collectible `AssemblyLoadContext`:
 
 ```text
 ├── Parsers/                 <-- Active drop-in language parser DLLs
@@ -99,8 +102,8 @@ The compiled executables and plugins will be located at:
 ```
 
 ### Multi-Tier Search Locations
-1. **Environment Tier**: `CODEGRAPH_PARSERS_DIR` or `CODEGRAPH_PARSERS_PATH`
-2. **User Tier**: `%LOCALAPPDATA%\CodeGraphMcp\Parsers`
+1. **Environment Tier**: `CODEATLAS_PARSERS_DIR` or `CODEATLAS_PARSERS_PATH`
+2. **User Tier**: `%LOCALAPPDATA%\CodeAtlas\Parsers`
 3. **Application Tier**: `{AppBaseDirectory}\Parsers`
 
 ### Anti-Shadowing Security Policies
@@ -111,48 +114,48 @@ The compiled executables and plugins will be located at:
 
 ## 📖 CLI How-to-Use Tutorial
 
-`CodeGraphMcp.Cli` (`cg`) operates as a standalone command-line utility.
+`CodeAtlas.Cli` (`atlas` / `codeatlas`) operates as a standalone command-line utility.
 
 ```powershell
-# 1. Index a repository (stores SQLite database inside <repo>/.codegraph/code_graph.db)
-.\publish\cli\CodeGraphMcp.Cli.exe index "C:\Projects\MyRepo"
+# 1. Index a repository (stores SQLite database inside <repo>/.codeatlas/atlas.db)
+.\publish\cli\codeatlas.exe index "C:\Projects\MyRepo"
 
 # 2. Query a symbol definition
-.\publish\cli\CodeGraphMcp.Cli.exe query "IndexOrchestrator" -r "C:\Projects\MyRepo"
+.\publish\cli\codeatlas.exe query "IndexOrchestrator" -r "C:\Projects\MyRepo"
 
 # 3. Query with type, language, and pagination filters
-.\publish\cli\CodeGraphMcp.Cli.exe query "Morningstar" -r "C:\Projects\MyRepo" --lang json --type Property --limit 20 --skip 0
+.\publish\cli\codeatlas.exe query "Morningstar" -r "C:\Projects\MyRepo" --lang json --type Property --limit 20 --skip 0
 
 # 4. Check index database status & commit state
-.\publish\cli\CodeGraphMcp.Cli.exe status "C:\Projects\MyRepo"
+.\publish\cli\codeatlas.exe status "C:\Projects\MyRepo"
 
 # 5. Manage drop-in language parser plugins
-.\publish\cli\CodeGraphMcp.Cli.exe parsers list               # List all installed parsers and statuses
-.\publish\cli\CodeGraphMcp.Cli.exe parsers disable json       # Move parser to DisabledParsers/
-.\publish\cli\CodeGraphMcp.Cli.exe parsers enable json        # Re-enable parser
-.\publish\cli\CodeGraphMcp.Cli.exe parsers info csharp        # View plugin metadata and assembly paths
+.\publish\cli\codeatlas.exe parsers list               # List all installed parsers and statuses
+.\publish\cli\codeatlas.exe parsers disable json       # Move parser to DisabledParsers/
+.\publish\cli\codeatlas.exe parsers enable json        # Re-enable parser
+.\publish\cli\codeatlas.exe parsers info csharp        # View plugin metadata and assembly paths
 
 # 6. Prune stale worktrees & obsolete index caches to reclaim disk space
-.\publish\cli\CodeGraphMcp.Cli.exe prune
+.\publish\cli\codeatlas.exe prune
 
 # 7. Continuous watcher for auto-reindexing on git commits
-.\publish\cli\CodeGraphMcp.Cli.exe watch "C:\Projects\MyRepo" --interval 30
+.\publish\cli\codeatlas.exe watch "C:\Projects\MyRepo" --interval 30
 
 # 8. Start the MCP stdio server for AI assistants
-.\publish\cli\CodeGraphMcp.Cli.exe serve
+.\publish\cli\codeatlas.exe serve
 ```
 
 ---
 
 ## 🤖 MCP Server Setup for AI Assistants
 
-To connect `CodeGraphMcp` to your AI coding assistant (Antigravity, Claude Desktop, Cursor, VSCode Roo Code), add the following entry to your `mcp_config.json`:
+To connect `CodeAtlas` to your AI coding assistant (Antigravity, Claude Desktop, Cursor, VSCode Roo Code), add the following entry to your `mcp_config.json`:
 
 ```json
 {
   "mcpServers": {
-    "codegraph": {
-      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+    "codeatlas": {
+      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeAtlas.Mcp.exe",
       "args": []
     }
   }
@@ -172,9 +175,9 @@ AI assistants receive 7 specialized code-graph tools:
 
 ---
 
-## ⚙️ Customizing Ignore & Include Rules (`.codegraph/settings.json`)
+## ⚙️ Customizing Ignore & Include Rules (`.codeatlas/settings.json`)
 
-Place a `settings.json` file inside your repository's `.codegraph/` directory to configure project-specific indexing scope:
+Place a `settings.json` file inside your repository's `.codeatlas/` directory to configure project-specific indexing scope:
 
 ```json
 {
@@ -198,7 +201,7 @@ Place a `settings.json` file inside your repository's `.codegraph/` directory to
 ## 👤 Author & Development Transparency
 
 - **Author & Maintainer**: **Garry Flanagan** ([ScriptedFluff](https://github.com/ScriptedFluff))
-- **Repository**: [ScriptedFluff/CodeGraphMcp](https://github.com/ScriptedFluff/CodeGraphMcp)
+- **Repository**: [ScriptedFluff/CodeAtlas](https://github.com/ScriptedFluff/CodeAtlas)
 - **License**: [Apache 2.0](file:///d:/Projects/C%23/CodeGraphMcp/LICENSE)
 
 ### 🤖 AI Pair-Programming Statement

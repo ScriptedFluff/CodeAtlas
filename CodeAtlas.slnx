@@ -1,0 +1,21 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CodeAtlas.Abstractions/CodeAtlas.Abstractions.csproj" />
+    <Project Path="src/CodeAtlas.Core/CodeAtlas.Core.csproj" />
+    <Project Path="src/CodeAtlas.Mcp/CodeAtlas.Mcp.csproj" />
+    <Project Path="src/CodeAtlas.Cli/CodeAtlas.Cli.csproj" />
+  </Folder>
+  <Folder Name="/src/Parsers/">
+    <Project Path="src/Parsers/CodeAtlas.Parsers.CSharp/CodeAtlas.Parsers.CSharp.csproj" />
+    <Project Path="src/Parsers/CodeAtlas.Parsers.TypeScript/CodeAtlas.Parsers.TypeScript.csproj" />
+    <Project Path="src/Parsers/CodeAtlas.Parsers.JavaScript/CodeAtlas.Parsers.JavaScript.csproj" />
+    <Project Path="src/Parsers/CodeAtlas.Parsers.Html/CodeAtlas.Parsers.Html.csproj" />
+    <Project Path="src/Parsers/CodeAtlas.Parsers.PowerShell/CodeAtlas.Parsers.PowerShell.csproj" />
+    <Project Path="src/Parsers/CodeAtlas.Parsers.Json/CodeAtlas.Parsers.Json.csproj" />
+    <Project Path="src/Parsers/CodeAtlas.Parsers.Yaml/CodeAtlas.Parsers.Yaml.csproj" />
+    <Project Path="src/Parsers/CodeAtlas.Parsers.Css/CodeAtlas.Parsers.Css.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CodeAtlas.Tests/CodeAtlas.Tests.csproj" />
+  </Folder>
+</Solution>

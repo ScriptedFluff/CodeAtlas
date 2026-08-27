@@ -1,4 +1,4 @@
-# Feature Specification: Query Filtering (`--filter`)
+﻿# Feature Specification: Query Filtering (`--filter`)
 
 ## 1. Overview & Objective
 
@@ -99,9 +99,9 @@ Every response payload includes pagination metadata containing the **last evalua
 ## 6. Implementation Design
 
 ### File Locations
-- `src/CodeGraphMcp.Core/Query/FilterTranspiler.cs`: Core token parser and SQL generator.
-- `src/CodeGraphMcp.Core/Db/Queries/SymbolQueries.cs`: Keyset cursor querying (`WHERE id > @cursor`) and streaming fetch.
-- `src/CodeGraphMcp/Commands/QueryCommand.cs`: CLI option parsing (`--filter` / `-f`, `--limit`, `--cursor`).
+- `src/CodeAtlas.Core/Query/FilterTranspiler.cs`: Core token parser and SQL generator.
+- `src/CodeAtlas.Core/Db/Queries/SymbolQueries.cs`: Keyset cursor querying (`WHERE id > @cursor`) and streaming fetch.
+- `src/CodeAtlas/Commands/QueryCommand.cs`: CLI option parsing (`--filter` / `-f`, `--limit`, `--cursor`).
 
 ---
 

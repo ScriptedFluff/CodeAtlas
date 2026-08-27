@@ -1,20 +1,20 @@
-# CodeGraphMcp — Developer Technical Specification & Command Architecture
+# CodeAtlas — Developer Technical Specification & Command Architecture
 
-`CodeGraphMcp` is a high-performance local code knowledge graph indexer, reference graph analysis engine, and Model Context Protocol (MCP) server designed for software architects and senior engineers. It parses multi-language source trees (C#, TypeScript, JavaScript, HTML, PowerShell, JSON, YAML, CSS), extracts syntax trees into relational SQLite graphs, tracks Git deltas for sub-second incremental indexing, performs cross-stack ServiceStack DTO linkage, and surfaces dirty uncommitted file modifications live to AI coding assistants.
+`CodeAtlas` is a high-performance local code knowledge graph indexer, reference graph analysis engine, and Model Context Protocol (MCP) server designed for software architects and senior engineers. It parses multi-language source trees (C#, TypeScript, JavaScript, HTML, PowerShell, JSON, YAML, CSS), extracts syntax trees into relational SQLite graphs, tracks Git deltas for sub-second incremental indexing, performs cross-stack ServiceStack DTO linkage, and surfaces dirty uncommitted file modifications live to AI coding assistants.
 
 ---
 
 ## 1. Core Architecture & Subsystems Overview
 
 ```
-CodeGraphMcp.slnx
+CodeAtlas.slnx
 ├── src/
-│   ├── CodeGraphMcp.Abstractions/ # Class Library (.dll) - Zero-dependency NuGet contracts & models
+│   ├── CodeAtlas.Abstractions/ # Class Library (.dll) - Zero-dependency NuGet contracts & models
 │   │   ├── Models/                # Symbol, SymbolReference, SymbolType
 │   │   └── Parser/                # ILanguageParser, ParserMetadata, ParserMetadataAttribute, FileParseResult
 │   │
-│   ├── CodeGraphMcp.Core/         # Class Library (.dll) - Domain logic & indexing engine
-│   │   ├── Config/                # CodeGraphSettings, StorageConfig, WorkspacePathResolver
+│   ├── CodeAtlas.Core/         # Class Library (.dll) - Domain logic & indexing engine
+│   │   ├── Config/                # AppConfig, StorageConfig, WorkspacePathResolver
 │   │   ├── Db/                    # SqliteDbFactory, Schema Migrations, Symbol Repositories, WorktreePruner
 │   │   ├── Indexer/               # IndexOrchestrator, SolutionRootResolver, DynamicWorkspaceService
 │   │   ├── Parser/                # IParserRegistry, ParserRegistry
@@ -24,34 +24,34 @@ CodeGraphMcp.slnx
 │   │   └── Models/                # IndexResult, CallerEntry, CrossStackMapping
 │   │
 │   ├── Parsers/                   # Standalone Drop-in Language Parser Plugins
-│   │   ├── CodeGraphMcp.Parsers.CSharp/
-│   │   ├── CodeGraphMcp.Parsers.TypeScript/
-│   │   ├── CodeGraphMcp.Parsers.JavaScript/
-│   │   ├── CodeGraphMcp.Parsers.Html/
-│   │   ├── CodeGraphMcp.Parsers.PowerShell/
-│   │   ├── CodeGraphMcp.Parsers.Json/
-│   │   ├── CodeGraphMcp.Parsers.Yaml/
-│   │   └── CodeGraphMcp.Parsers.Css/
+│   │   ├── CodeAtlas.Parsers.CSharp/
+│   │   ├── CodeAtlas.Parsers.TypeScript/
+│   │   ├── CodeAtlas.Parsers.JavaScript/
+│   │   ├── CodeAtlas.Parsers.Html/
+│   │   ├── CodeAtlas.Parsers.PowerShell/
+│   │   ├── CodeAtlas.Parsers.Json/
+│   │   ├── CodeAtlas.Parsers.Yaml/
+│   │   └── CodeAtlas.Parsers.Css/
 │   │
-│   ├── CodeGraphMcp.Server/       # Executable (.exe) - MCP Daemon Host (ReadyToRun)
+│   ├── CodeAtlas.Mcp/       # Executable (.exe) - MCP Daemon Host (ReadyToRun)
 │   │   ├── Mcp/                   # 7 MCP Tool Registrations & JSON-RPC Dispatcher
 │   │   └── Program.cs             # Entry point for stdio MCP daemon host
 │   │
-│   └── CodeGraphMcp.Cli/          # Executable (.exe) - Command Line Utility (ReadyToRun)
+│   └── CodeAtlas.Cli/          # Executable (.exe) - Command Line Utility (ReadyToRun)
 │       ├── Commands/              # Index, Query, Status, Parsers, Prune, Watch, Serve
 │       └── Program.cs             # Entry point for CLI command runner
 ```
 
 ### Decoupled Subsystem Responsibilities
 
-1. **Abstractions Library (`CodeGraphMcp.Abstractions`)**:
+1. **Abstractions Library (`CodeAtlas.Abstractions`)**:
     - **Standalone NuGet Package**: Zero-dependency library targeting `.NET 10.0`, `.NET 8.0`, and `.NET Standard 2.0`.
     - **Core Contracts & Models**: Exposes `ILanguageParser`, `Symbol`, `SymbolReference`, `SymbolType`, `ParserMetadata`, `ParserMetadataAttribute`, and `FileParseResult`.
     - Enables 3rd party developers and community contributors to write custom drop-in parsers without referencing engine runtime dependencies.
 
-2. **Core Domain Library (`CodeGraphMcp.Core`)**:
-    - **Dynamic Plugin Engine (`Plugins/`)**: Loads drop-in parser assemblies into collectible `AssemblyLoadContext` instances. Delegates `CodeGraphMcp.Abstractions`, `CodeGraphMcp.Core`, and `TreeSitter` to host ALC to preserve type identity for `ILanguageParser` and `TreeSitter.Node`.
-    - **Multi-Tier Directory Resolver (`ParserDirectoryResolver`)**: Scans `Environment` (`CODEGRAPH_PARSERS_DIR`), `User` (`%LOCALAPPDATA%\CodeGraphMcp\Parsers`), and `Application` (`{AppBase}\Parsers`) locations.
+2. **Core Domain Library (`CodeAtlas.Core`)**:
+    - **Dynamic Plugin Engine (`Plugins/`)**: Loads drop-in parser assemblies into collectible `AssemblyLoadContext` instances. Delegates `CodeAtlas.Abstractions`, `CodeAtlas.Core`, and `TreeSitter` to host ALC to preserve type identity for `ILanguageParser` and `TreeSitter.Node`.
+    - **Multi-Tier Directory Resolver (`ParserDirectoryResolver`)**: Scans `Environment` (`CODEATLAS_PARSERS_DIR`), `User` (`%LOCALAPPDATA%\CodeAtlas\Parsers`), and `Application` (`{AppBase}\Parsers`) locations.
     - **Security Policy Engine (`ParserSecurityEvaluator`)**: Prevents DLL hijacking and unprivileged shadowing (`Strict`, `AllowAll`, `AllowList`).
     - **Streaming Indexing Pipeline**: Uses a `Channel`-based Producer-Consumer pipeline to stream parsed AST results asynchronously from parallel CPU workers to a background SQLite writer task in 250-file batches without CPU idle time.
     - **Git Delta Tracker**: `git diff` interrogation against `last_indexed_commit` for sub-second incremental indexing.
@@ -63,14 +63,13 @@ CodeGraphMcp.slnx
     - Decoupled projects compiled independently and output into `Parsers/<ParserName>/`.
     - Implements `ILanguageParser` and declares `ParserMetadata` (ID, language, file extensions, version, author).
 
-3. **MCP Daemon Host (`CodeGraphMcp.Server`)**:
+3. **MCP Daemon Host (`CodeAtlas.Mcp`)**:
     - Implements JSON-RPC 2.0 over standard I/O streams (`stdio`) via `ModelContextProtocol.Server`.
     - Exposes 7 specialized knowledge graph tools directly to AI assistants.
 
-4. **CLI Utility Launcher (`CodeGraphMcp.Cli` / `cg`)**:
+4. **CLI Utility Launcher (`CodeAtlas.Cli` / `atlas`)**:
     - Command-line utility built on `System.CommandLine`.
-    - Executes `index`, `query`, `status`, `parsers`, `watch`, `clean`, and `prune` commands. Delegated `serve` launches `CodeGraphMcp.Server`.CommandLine`.
-   - Executes `index`, `query`, `status`, `watch`, `clean`, and `prune` commands. Delegated `serve` launches `CodeGraphMcp.Server`.
+    - Executes `index`, `query`, `status`, `parsers`, `watch`, `clean`, and `prune` commands. Delegated `serve` launches `CodeAtlas.Mcp`.
 
 ---
 
@@ -83,20 +82,20 @@ Parses, indexes, and builds symbol/reference graphs for a target repository.
 - **Incremental Logic**: Performs git commit inspection. If HEAD equals `last_indexed_commit` and no uncommitted files exist, execution terminates instantly (<20ms).
 - **Execution Options**:
   - `<repo-path>` *(Required)*: Target repository directory.
-  - `--db-dir <path>`: Custom location for the SQLite database (defaults to `<repo-path>/.codegraph/`).
+  - `--db-dir <path>`: Custom location for the SQLite database (defaults to `<repo-path>/.codeatlas/`).
   - `--force-full`: Forces full parse cycle, bypassing Git delta detection.
   - `--no-ignore`: Ignores `.gitignore` rules to index hidden or build-generated source files.
 
 #### Examples:
 ```powershell
 # Standard local repository index
-CodeGraphMcp index "D:\Projects\C#\CodeGraphMcp"
+CodeAtlas index "D:\Projects\C#\CodeAtlas"
 
 # Force complete re-index overriding git deltas and ignore rules
-CodeGraphMcp index "C:\Services\PaymentGateway" --force-full --no-ignore
+CodeAtlas index "C:\Services\PaymentGateway" --force-full --no-ignore
 
 # Store index in custom central path
-CodeGraphMcp index "C:\Repo" --db-dir "C:\SharedIndexes\RepoDb"
+CodeAtlas index "C:\Repo" --db-dir "C:\SharedIndexes\RepoDb"
 ```
 
 ---
@@ -113,10 +112,10 @@ Searches for symbol definitions, signatures, line boundaries, and source code di
 #### Examples:
 ```powershell
 # Query symbol definition within the local directory
-CodeGraphMcp query "IndexOrchestrator"
+CodeAtlas query "IndexOrchestrator"
 
 # Query specific project repository from an external directory
-CodeGraphMcp query "PaymentProcessor" --repo "D:\Projects\Services\Billing"
+CodeAtlas query "PaymentProcessor" --repo "D:\Projects\Services\Billing"
 ```
 
 ---
@@ -131,7 +130,7 @@ Reports current repository health, branch info, committed vs. indexed state, and
 #### Examples:
 ```powershell
 # Inspect repository index status
-CodeGraphMcp status "D:\Projects\C#\CodeGraphMcp"
+CodeAtlas status "D:\Projects\C#\CodeAtlas"
 ```
 
 ---
@@ -147,7 +146,7 @@ Runs a background daemon polling Git commit state and updating the index upon co
 #### Examples:
 ```powershell
 # Watch repository with 15-second polling loop
-CodeGraphMcp watch "D:\Projects\C#\CodeGraphMcp" --interval 15
+CodeAtlas watch "D:\Projects\C#\CodeAtlas" --interval 15
 ```
 
 ---
@@ -163,7 +162,7 @@ Purges SQLite databases and WAL journal files associated with the repository.
 #### Examples:
 ```powershell
 # Purge local repository index database silently
-CodeGraphMcp clean "D:\Projects\C#\CodeGraphMcp" --yes
+CodeAtlas clean "D:\Projects\C#\CodeAtlas" --yes
 ```
 
 ---
@@ -179,10 +178,10 @@ Launches the Model Context Protocol (MCP) server over `stdio` for AI tool integr
 #### Examples:
 ```powershell
 # Launch unbound dynamic MCP server
-CodeGraphMcp serve
+CodeAtlas serve
 
 # Launch repository-bound MCP server using local index
-CodeGraphMcp serve --repo "D:\Projects\C#\CodeGraphMcp"
+CodeAtlas serve --repo "D:\Projects\C#\CodeAtlas"
 ```
 
 ---
@@ -195,7 +194,7 @@ Before renaming or refactoring core methods, developers can use `get_diff_impact
 **Workflow Command Example:**
 ```powershell
 # Index project first
-CodeGraphMcp index "C:\Projects\CoreEngine"
+CodeAtlas index "C:\Projects\CoreEngine"
 
 # MCP Tool Request Payload (via JSON-RPC stdio)
 # Tool: get_diff_impact
@@ -213,7 +212,7 @@ Tracing how C# backend Request/Response DTO contracts bind to TypeScript interfa
 ```
 
 ### Use Case C: Live Uncommitted Editing Verification
-When editing files in an IDE, AI agents query the MCP server. `CodeGraphMcp` reads the dirty file buffer directly from disk, delivering up-to-the-second symbol line ranges even before saving to disk.
+When editing files in an IDE, AI agents query the MCP server. `CodeAtlas` reads the dirty file buffer directly from disk, delivering up-to-the-second symbol line ranges even before saving to disk.
 
 ---
 
@@ -221,17 +220,21 @@ When editing files in an IDE, AI agents query the MCP server. `CodeGraphMcp` rea
 
 | Tool Name | Key Parameters | Developer Description |
 | :--- | :--- | :--- |
-| `get_symbol_definition` | `symbolName`, `symbolType`, `filePath`, `targetDirectory` | Returns exact source implementation snippet, line boundaries, signature, and doc comments. Supports `%` wildcards. |
+| `get_symbol_definition` | `symbolName`, `symbolType`, `filePath`, `targetDirectory`, `withReferences` | Returns exact source implementation snippet, line boundaries, signature, and doc comments. Supports `%` wildcards and live dirty buffer reading. |
 | `find_symbol_callers` | `symbolName`, `targetDirectory` | Performs inverse graph lookup to return all caller invocation sites. |
 | `search_codebase_graph` | `pattern`, `symbolType`, `language`, `targetDirectory`, `exactMatch`, `regex`, `limit` | Searches matching symbols across multi-language index using wildcard regex/SQL matching with relevance ordering and configurable result limits. |
+| `get_supported_languages` | *None* | Discovers supported file extensions and active AST language parsers loaded on the CodeAtlas server instance. |
 | `get_diff_impact` | `sinceCommit`, `targetDirectory` | Computes changed symbol set and downstream callers affected by uncommitted or recent git changes. |
 | `get_servicestack_dto_contract` | `dtoName`, `targetDirectory` | Maps end-to-end ServiceStack C# DTOs to TypeScript types and consuming client components. |
+| `prune_indexed_worktrees` | `dbDir`, `dryRun` | Scans global index database cache for non-existent repositories or git worktrees, purging obsolete `.db` files to reclaim disk space. |
+| `sync_file` | `filePath`, `content`, `delete`, `targetDirectory` | Surgically updates or deletes a single file in the SQLite knowledge graph in milliseconds (< 20ms). |
+| `sync_git_diff` | `targetDirectory`, `noIgnore` | Performs fast incremental delta sync of all git-modified and dirty files against the local SQLite index. |
 
 ---
 
 ## 5. Local Inter-Agent Relay Service Architecture
 
-`CodeGraphMcp` includes a localized HTTP daemon (`scripts/relay/`) enabling real-time communication between decoupled AI agents (e.g. Antigravity/AGY and GitHub Copilot).
+`CodeAtlas` includes a localized HTTP daemon (`scripts/relay/`) enabling real-time communication between decoupled AI agents (e.g. Antigravity/AGY and GitHub Copilot).
 
 - **Port**: `http://localhost:9123`
 - **Endpoints**:
@@ -254,7 +257,7 @@ When editing files in an IDE, AI agents query the MCP server. `CodeGraphMcp` rea
 To add support for a new programming language (e.g. Rust, Go, Python, SQL) as an independent drop-in plugin:
 
 ### Step 1: Create the Parser Project
-Create a class library under `src/Parsers/CodeGraphMcp.Parsers.<Language>/` (or as a standalone third-party repository):
+Create a class library under `src/Parsers/CodeAtlas.Parsers.<Language>/` (or as a standalone third-party repository):
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -267,17 +270,17 @@ Create a class library under `src/Parsers/CodeGraphMcp.Parsers.<Language>/` (or 
 
   <ItemGroup>
     <!-- Reference the standalone NuGet package or internal project -->
-    <PackageReference Include="CodeGraphMcp.Abstractions" Version="1.0.0" />
+    <PackageReference Include="CodeAtlas.Abstractions" Version="1.0.0" />
   </ItemGroup>
 </Project>
 ```
 
 ### Step 2: Implement `ILanguageParser`
 ```csharp
-using CodeGraphMcp.Models;
-using CodeGraphMcp.Parser;
+using CodeAtlas.Models;
+using CodeAtlas.Parser;
 
-namespace CodeGraphMcp.Parsers.Rust;
+namespace CodeAtlas.Parsers.Rust;
 
 [ParserMetadata("rust", "Rust Parser", "1.0.0", Description = "Rust language AST symbol parser", Author = "Community Contributor")]
 public sealed class RustParser : ILanguageParser
@@ -301,14 +304,14 @@ public sealed class RustParser : ILanguageParser
 
 ### Step 3: Drop into `Parsers/` Directory
 Copy the compiled DLL and its dependencies into any of the search locations:
-- **Application**: `<AppRoot>/Parsers/Rust/CodeGraphMcp.Parsers.Rust.dll`
-- **User**: `%LOCALAPPDATA%/CodeGraphMcp/Parsers/Rust/CodeGraphMcp.Parsers.Rust.dll`
-- **Environment**: `$env:CODEGRAPH_PARSERS_DIR/Rust/CodeGraphMcp.Parsers.Rust.dll`
+- **Application**: `<AppRoot>/Parsers/Rust/CodeAtlas.Parsers.Rust.dll`
+- **User**: `%LOCALAPPDATA%/CodeAtlas/Parsers/Rust/CodeAtlas.Parsers.Rust.dll`
+- **Environment**: `$env:CODEATLAS_PARSERS_DIR/Rust/CodeAtlas.Parsers.Rust.dll`
 
 ### Step 4: Verify with CLI
 ```powershell
-.\publish\cli\CodeGraphMcp.Cli.exe parsers list
-.\publish\cli\CodeGraphMcp.Cli.exe parsers info rust
+.\publish\cli\CodeAtlas.Cli.exe parsers list
+.\publish\cli\CodeAtlas.Cli.exe parsers info rust
 ```
 The parser is immediately available for indexing across both the CLI utility and the background MCP Server daemon!
 

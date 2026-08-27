@@ -1,4 +1,4 @@
----
+﻿---
 
 ## Key Design Principles
 
@@ -65,7 +65,7 @@ The engine resolves database file storage in strict order of precedence:
 | Priority | Flag / Trigger | Behavior | Target Path |
 | :--- | :--- | :--- | :--- |
 | **1 (Highest)** | `--db-dir <path>` | Custom directory override | `<path>/<project_hash>.db` |
-| **2** | `--store-local` (`-l`) | Store directly inside repo root | `<repo_root>/.agent-index/code_graph.db` |
+| **2** | `--store-local` (`-l`) | Store directly inside repo root | `<repo_root>/.agent-index/atlas.db` |
 | **3 (Default)** | *(None)* | Global user data (Zero repo pollution) | **Win:** `%LOCALAPPDATA%\\CodeGraph\\dbs\\<hash>.db`<br>**Linux:** `~/.local/share/codegraph/dbs/<hash>.db` |
 
 ---
@@ -402,7 +402,7 @@ html_content = """<!DOCTYPE html>
                 ▼                          ▼                      ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            DATA STORAGE TIER                                │
-│  • Primary DB: SQLite Relational Knowledge Graph (`code_graph.db`)          │
+│  • Primary DB: SQLite Relational Knowledge Graph (`atlas.db`)          │
 │  • In-Memory Buffer: Live Uncommitted/Staged File Parser                    │
 │  • Storage Options: Global LocalAppData (Default) | Project Local | Custom │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -482,7 +482,7 @@ html_content = """<!DOCTYPE html>
             <tr>
                 <td><span class="badge">2</span></td>
                 <td><code>--store-local</code> (<code>-l</code>)</td>
-                <td><code>&lt;repo&gt;/.agent-index/code_graph.db</code></td>
+                <td><code>&lt;repo&gt;/.agent-index/atlas.db</code></td>
                 <td>In-repo team sharing and branch-level Git tracking.</td>
             </tr>
             <tr>

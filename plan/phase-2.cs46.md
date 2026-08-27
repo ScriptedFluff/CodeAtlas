@@ -1,5 +1,5 @@
-# Phase 2 — Git Delta Engine & Live File Buffer
-## Detailed Implementation Plan — CodeGraphMcp (C# / .NET 10)
+﻿# Phase 2 — Git Delta Engine & Live File Buffer
+## Detailed Implementation Plan — CodeAtlas (C# / .NET 10)
 
 **Version:** 1.0.0  
 **Phase:** 2 of 4  
@@ -19,7 +19,7 @@ Switch from full re-scan on every `index` call to an intelligent, commit-aware d
 2. **GIT-02** — Extend `index_state` to track the head commit hash, branch name, and a dirty-files counter so the engine knows *where to resume from* on subsequent calls.
 3. **GIT-03** — Add a live in-memory `DirtyFileBuffer` that parses unsaved/uncommitted edits on demand, overlaying the DB result so MCP tools always return the freshest data.
 
-The end result: `CodeGraphMcp.exe index` on a large repo after a small commit should be **~10–50× faster** than a full re-parse, and symbol queries should reflect in-progress edits without requiring a commit.
+The end result: `CodeAtlas.exe index` on a large repo after a small commit should be **~10–50× faster** than a full re-parse, and symbol queries should reflect in-progress edits without requiring a commit.
 
 ---
 
@@ -56,18 +56,18 @@ CREATE TABLE IF NOT EXISTS index_state (
 
 | File | Relevance |
 | :--- | :--- |
-| [Program.cs](file:///D:/Projects/C%23/repositorydb/src/CodeGraphMcp/Program.cs) | `index` command handler — needs delta mode wired in |
-| [IndexOrchestrator.cs](file:///D:/Projects/C%23/repositorydb/src/CodeGraphMcp/Indexer/IndexOrchestrator.cs) | Full-scan walker — delta engine wraps/extends this |
-| [CodeGraphDb.cs](file:///D:/Projects/C%23/repositorydb/src/CodeGraphMcp/Db/CodeGraphDb.cs) | Connection factory — gains `IndexState` queries accessor |
-| [SymbolQueries.cs](file:///D:/Projects/C%23/repositorydb/src/CodeGraphMcp/Db/Queries/SymbolQueries.cs) | Needs `DeleteByFile(path)` for delta cleanup |
-| [MigrationRunner.cs](file:///D:/Projects/C%23/repositorydb/src/CodeGraphMcp/Db/MigrationRunner.cs) | Schema already has `index_state` — no migration changes needed |
+| [Program.cs](file:///D:/Projects/C%23/repositorydb/src/CodeAtlas/Program.cs) | `index` command handler — needs delta mode wired in |
+| [IndexOrchestrator.cs](file:///D:/Projects/C%23/repositorydb/src/CodeAtlas/Indexer/IndexOrchestrator.cs) | Full-scan walker — delta engine wraps/extends this |
+| [CodeAtlasDb.cs](file:///D:/Projects/C%23/repositorydb/src/CodeAtlas/Db/CodeAtlasDb.cs) | Connection factory — gains `IndexState` queries accessor |
+| [SymbolQueries.cs](file:///D:/Projects/C%23/repositorydb/src/CodeAtlas/Db/Queries/SymbolQueries.cs) | Needs `DeleteByFile(path)` for delta cleanup |
+| [MigrationRunner.cs](file:///D:/Projects/C%23/repositorydb/src/CodeAtlas/Db/MigrationRunner.cs) | Schema already has `index_state` — no migration changes needed |
 
 ---
 
 ## Directory Structure Changes (Phase 2 Additions)
 
 ```
-src/CodeGraphMcp/
+src/CodeAtlas/
 ├── Git/                                     ← NEW namespace
 │   ├── DeltaEngine.cs                       ← [NEW] Git diff → changed file list
 │   ├── DirtyFileBuffer.cs                   ← [NEW] In-memory live symbol overlay
@@ -82,7 +82,7 @@ src/CodeGraphMcp/
 ```
 
 ```
-tests/CodeGraphMcp.Tests/
+tests/CodeAtlas.Tests/
 ├── Fixtures/
 │   └── SampleClass.cs                       ← Unchanged
 ├── Git/                                     ← NEW
@@ -100,13 +100,13 @@ tests/CodeGraphMcp.Tests/
 `LibGit2Sharp` provides managed .NET bindings to `libgit2`. It is **not** AOT-trimming-friendly by default, so it must be added with a native library bundle. The package ships with native DLLs for `win-x64`.
 
 ```powershell
-cd D:\Projects\C#\repositorydb\src\CodeGraphMcp
+cd D:\Projects\C#\repositorydb\src\CodeAtlas
 dotnet add package LibGit2Sharp --version 0.30.0
 ```
 
 Also add to the test project:
 ```powershell
-cd D:\Projects\C#\repositorydb\tests\CodeGraphMcp.Tests
+cd D:\Projects\C#\repositorydb\tests\CodeAtlas.Tests
 dotnet add package LibGit2Sharp --version 0.30.0
 ```
 
@@ -182,7 +182,7 @@ public static class GitHelpers
 // Db/Queries/IndexStateQueries.cs
 using Microsoft.Data.Sqlite;
 
-namespace CodeGraphMcp.Db.Queries;
+namespace CodeAtlas.Core.Db.Queries;
 
 public sealed class IndexStateQueries(SqliteConnection connection)
 {
@@ -236,7 +236,7 @@ public sealed class IndexStateQueries(SqliteConnection connection)
 
 ### 1.4 — `SymbolQueries.cs` — Add Delta Methods
 
-Add the following methods to the existing `SymbolQueries` class in [SymbolQueries.cs](file:///D:/Projects/C%23/repositorydb/src/CodeGraphMcp/Db/Queries/SymbolQueries.cs):
+Add the following methods to the existing `SymbolQueries` class in [SymbolQueries.cs](file:///D:/Projects/C%23/repositorydb/src/CodeAtlas/Db/Queries/SymbolQueries.cs):
 
 ```csharp
 /// <summary>
@@ -280,11 +280,11 @@ public void UpsertFileDelta(string relFilePath, IEnumerable<Models.Symbol> symbo
 
 ```csharp
 // Git/DeltaEngine.cs
-using CodeGraphMcp.Db;
-using CodeGraphMcp.Db.Queries;
-using CodeGraphMcp.Parser;
+using CodeAtlas.Core.Db;
+using CodeAtlas.Core.Db.Queries;
+using CodeAtlas.Parser;
 
-namespace CodeGraphMcp.Git;
+namespace CodeAtlas.Core.Git;
 
 /// <summary>
 /// Determines which files have changed since the last indexed commit
@@ -292,7 +292,7 @@ namespace CodeGraphMcp.Git;
 /// </summary>
 public sealed class DeltaEngine(
     string repoPath,
-    CodeGraphDb db,
+    CodeAtlasDb db,
     IReadOnlyList<ILanguageParser> parsers)
 {
     private readonly Dictionary<string, ILanguageParser> _extensionMap = BuildMap(parsers);
@@ -417,7 +417,7 @@ public sealed class DeltaEngine(
 // Git/GitHelpers.cs
 using System.Diagnostics;
 
-namespace CodeGraphMcp.Git;
+namespace CodeAtlas.Core.Git;
 
 /// <summary>
 /// Thin shell-based git helpers.
@@ -505,12 +505,12 @@ public static class GitHelpers
 > [!TIP]
 > Using `git` shell calls instead of LibGit2Sharp gives us AOT compatibility for free. The 3–5ms process-spawn overhead is negligible compared to file I/O and parse time. This also avoids bundling the `git2-*.dll` native library in the publish output.
 
-### 1.7 — `CodeGraphDb.cs` Changes
+### 1.7 — `CodeAtlasDb.cs` Changes
 
 Add an `IndexState` accessor alongside `Symbols` and `References`:
 
 ```csharp
-// Add to CodeGraphDb constructor and property declarations:
+// Add to CodeAtlasDb constructor and property declarations:
 public IndexStateQueries IndexState { get; }
 
 // In constructor, after existing query setup:
@@ -521,20 +521,20 @@ IndexState = new IndexStateQueries(_connection);
 
 ```powershell
 # Fresh index (full mode)
-.\publish\CodeGraphMcp.exe index D:\Projects\C#\repositorydb --store-local
+.\publish\CodeAtlas.exe index D:\Projects\C#\repositorydb --store-local
 # Expected: "Indexed 19 files, 81 symbols (Xms) [full]"
 
 # Immediate re-index (noop mode — HEAD hasn't changed)
-.\publish\CodeGraphMcp.exe index D:\Projects\C#\repositorydb --store-local
+.\publish\CodeAtlas.exe index D:\Projects\C#\repositorydb --store-local
 # Expected: "Nothing to index — HEAD unchanged (Xms) [noop]"
 
 # Make a change, commit, then delta index
 git -C D:\Projects\C#\repositorydb add . && git commit -m "test delta"
-.\publish\CodeGraphMcp.exe index D:\Projects\C#\repositorydb --store-local
+.\publish\CodeAtlas.exe index D:\Projects\C#\repositorydb --store-local
 # Expected: "1 file changed, N symbols updated (Xms) [delta]"
 
 # Verify index_state
-sqlite3 "D:\Projects\C#\repositorydb\.agent-index\code_graph.db" "SELECT * FROM index_state ORDER BY indexed_at DESC LIMIT 3;"
+sqlite3 "D:\Projects\C#\repositorydb\.agent-index\atlas.db" "SELECT * FROM index_state ORDER BY indexed_at DESC LIMIT 3;"
 ```
 
 ---
@@ -557,7 +557,7 @@ indexCommand.AddOption(forceFull);
 indexCommand.SetHandler(async (repo, dbDir, storeLocal, force) =>
 {
     var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, repo.FullName);
-    using var db = new CodeGraphDb(dbPath);
+    using var db = new CodeAtlasDb(dbPath);
     db.Migrate();
 
     if (force || !GitHelpers.IsGitRepo(repo.FullName))
@@ -588,15 +588,15 @@ indexCommand.SetHandler(async (repo, dbDir, storeLocal, force) =>
 
 ```powershell
 # Mode 1: --store-local
-.\publish\CodeGraphMcp.exe index D:\Projects\C#\repositorydb --store-local
-# DB at: D:\Projects\C#\repositorydb\.agent-index\code_graph.db
+.\publish\CodeAtlas.exe index D:\Projects\C#\repositorydb --store-local
+# DB at: D:\Projects\C#\repositorydb\.agent-index\atlas.db
 
 # Mode 2: --db-dir
-.\publish\CodeGraphMcp.exe index D:\Projects\C#\repositorydb --db-dir D:\Temp\CodeGraph
+.\publish\CodeAtlas.exe index D:\Projects\C#\repositorydb --db-dir D:\Temp\CodeGraph
 # DB at: D:\Temp\CodeGraph\<hash>.db
 
 # Mode 3: Default LOCALAPPDATA
-.\publish\CodeGraphMcp.exe index D:\Projects\C#\repositorydb
+.\publish\CodeAtlas.exe index D:\Projects\C#\repositorydb
 # DB at: %LOCALAPPDATA%\CodeGraph\dbs\<hash>.db
 ```
 
@@ -605,8 +605,8 @@ indexCommand.SetHandler(async (repo, dbDir, storeLocal, force) =>
 All three storage modes produce a working DB. Verified by running `query CSharpParser` against each:
 
 ```powershell
-.\publish\CodeGraphMcp.exe query CSharpParser --store-local
-# Expected: [Class] CSharpParser | src\CodeGraphMcp\Parser\CSharpParser.cs:7-192
+.\publish\CodeAtlas.exe query CSharpParser --store-local
+# Expected: [Class] CSharpParser | src\CodeAtlas\Parser\CSharpParser.cs:7-192
 ```
 
 ---
@@ -627,10 +627,10 @@ This means a developer can open a file, add a new method, and immediately ask th
 
 ```csharp
 // Git/DirtyFileBuffer.cs
-using CodeGraphMcp.Models;
-using CodeGraphMcp.Parser;
+using CodeAtlas.Models;
+using CodeAtlas.Parser;
 
-namespace CodeGraphMcp.Git;
+namespace CodeAtlas.Core.Git;
 
 /// <summary>
 /// Parses uncommitted (dirty) files on demand and caches the results in memory.
@@ -724,14 +724,14 @@ public sealed class DirtyFileBuffer(string repoPath, IReadOnlyList<ILanguagePars
 
 ### 3.3 — Wiring the Buffer into `query` Command
 
-Update the `query` command handler in [Program.cs](file:///D:/Projects/C%23/repositorydb/src/CodeGraphMcp/Program.cs) to check the dirty buffer first:
+Update the `query` command handler in [Program.cs](file:///D:/Projects/C%23/repositorydb/src/CodeAtlas/Program.cs) to check the dirty buffer first:
 
 ```csharp
 queryCommand.SetHandler((symbol, dbDir, storeLocal) =>
 {
     var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, Directory.GetCurrentDirectory());
     var repoRoot = FindGitRoot(Directory.GetCurrentDirectory()) ?? Directory.GetCurrentDirectory();
-    using var db = new CodeGraphDb(dbPath);
+    using var db = new CodeAtlasDb(dbPath);
     db.Migrate();
 
     // 1. Check dirty buffer first
@@ -789,19 +789,19 @@ public int CountByFile(string relFilePath)
 #    (e.g. add a new method to CSharpParser.cs)
 
 # 2. Query for the new symbol
-.\publish\CodeGraphMcp.exe query MyNewMethod --store-local
+.\publish\CodeAtlas.exe query MyNewMethod --store-local
 # Expected output:
 #   [LIVE - uncommitted]
-#     [Method] MyNewMethod | src/CodeGraphMcp/Parser/CSharpParser.cs:X-Y
+#     [Method] MyNewMethod | src/CodeAtlas/Parser/CSharpParser.cs:X-Y
 
 # 3. Commit the file and re-index
 git -C D:\Projects\C#\repositorydb add . && git commit -m "add MyNewMethod"
-.\publish\CodeGraphMcp.exe index D:\Projects\C#\repositorydb --store-local
+.\publish\CodeAtlas.exe index D:\Projects\C#\repositorydb --store-local
 
 # 4. Query again — should come from DB now (no [LIVE] prefix)
-.\publish\CodeGraphMcp.exe query MyNewMethod --store-local
+.\publish\CodeAtlas.exe query MyNewMethod --store-local
 # Expected output:
-#   [Method] MyNewMethod | src/CodeGraphMcp/Parser/CSharpParser.cs:X-Y
+#   [Method] MyNewMethod | src/CodeAtlas/Parser/CSharpParser.cs:X-Y
 ```
 
 ---
@@ -813,8 +813,8 @@ git -C D:\Projects\C#\repositorydb add . && git commit -m "add MyNewMethod"
 Create a temporary git repo using `git init`, make commits, and verify delta behaviour:
 
 ```csharp
-// tests/CodeGraphMcp.Tests/Git/DeltaEngineTests.cs
-namespace CodeGraphMcp.Tests.Git;
+// tests/CodeAtlas.Tests/Git/DeltaEngineTests.cs
+namespace CodeAtlas.Tests.Git;
 
 public sealed class DeltaEngineTests : IDisposable
 {
@@ -897,10 +897,10 @@ public sealed class DeltaEngineTests : IDisposable
         RunGit(_tempRepo, $"commit -m \"{name}\"");
     }
 
-    private CodeGraphDb CreateInMemoryDb()
+    private CodeAtlasDb CreateInMemoryDb()
     {
         // Use :memory: or a per-test temp file
-        var db = new CodeGraphDb(Path.Combine(_tempRepo, "test.db"));
+        var db = new CodeAtlasDb(Path.Combine(_tempRepo, "test.db"));
         db.Migrate();
         return db;
     }
@@ -926,8 +926,8 @@ public sealed class DeltaEngineTests : IDisposable
 ### `DirtyFileBufferTests.cs`
 
 ```csharp
-// tests/CodeGraphMcp.Tests/Git/DirtyFileBufferTests.cs
-namespace CodeGraphMcp.Tests.Git;
+// tests/CodeAtlas.Tests/Git/DirtyFileBufferTests.cs
+namespace CodeAtlas.Tests.Git;
 
 public sealed class DirtyFileBufferTests : IDisposable
 {
@@ -1023,7 +1023,7 @@ None. The `index_state` table was created in Phase 1's `MigrationRunner.cs` and 
 ```
 1. Add git shell helpers     → Git/GitHelpers.cs
 2. Add IndexStateQueries     → Db/Queries/IndexStateQueries.cs
-3. Wire IndexState into DB   → Db/CodeGraphDb.cs (add accessor)
+3. Wire IndexState into DB   → Db/CodeAtlasDb.cs (add accessor)
 4. Add SymbolQueries methods → DeleteByFile, CountByFile, UpsertFileDelta
 5. Implement DeltaEngine     → Git/DeltaEngine.cs
 6. Implement DirtyFileBuffer → Git/DirtyFileBuffer.cs

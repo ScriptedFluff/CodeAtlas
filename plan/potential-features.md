@@ -1,6 +1,6 @@
-# CodeGraphMcp Potential Features Roadmap
+﻿# CodeAtlas Potential Features Roadmap
 
-This document tracks candidate features and enhancements for `CodeGraphMcp` derived from benchmark findings and architecture recommendations.
+This document tracks candidate features and enhancements for `CodeAtlas` derived from benchmark findings and architecture recommendations.
 
 ---
 
@@ -20,12 +20,12 @@ This document tracks candidate features and enhancements for `CodeGraphMcp` deri
 
 ### 4. Stale Worktree & Index Cleanup Utility (`prune_indexed_worktrees`)
 - **Status**: **Completed**
-- **Description**: Introduce a `prune_indexed_worktrees` / `cleanup_index_cache` tool and startup auto-garbage collector to purge un-registered or missing git worktree paths from `code_graph.db` and reclaim disk space.
+- **Description**: Introduce a `prune_indexed_worktrees` / `cleanup_index_cache` tool and startup auto-garbage collector to purge un-registered or missing git worktree paths from `atlas.db` and reclaim disk space.
 
 ### 5. Global Registry Awareness, Index Linking & Layered Delta Storage
 - **Status**: Proposed (Requires R&D)
 - **Description**:
-  - **Global Awareness of Local (`--store-local`) Indexes**: Maintain a lightweight global registry so global management tools (`prune`, `status`) stay aware of all `.agent-index/code_graph.db` database instances created across repository worktrees.
+  - **Global Awareness of Local (`--store-local`) Indexes**: Maintain a lightweight global registry so global management tools (`prune`, `status`) stay aware of all `.agent-index/atlas.db` database instances created across repository worktrees.
   - **Identical Commit Deduplication / Index Linking**: When indexing a new worktree sharing the exact same `HEAD` commit hash as an existing index, avoid immediately duplicating the SQLite database. Link to the existing base index until worktrees diverge.
   - **Layered Delta Storage (Immutable Base + Local Overlay)**: When worktrees built from a shared base commit diverge, keep the common base index immutable and record only delta diffs/new symbols in the worktree's local DB (or lazily supersede the base index).
   - **R&D / Speed Requirement**: Requires benchmark evaluation (e.g. SQLite `ATTACH DATABASE` or overlay views) to guarantee multi-database overlay queries do not degrade warm query performance below the sub-100ms SLA.
@@ -57,7 +57,7 @@ This document tracks candidate features and enhancements for `CodeGraphMcp` deri
 
 ### 9. Language-Agnostic Parser-Driven Symbol Merging (Multi-Location Contract)
 - **Status**: Proposed
-- **Description**: Keep core `IndexOrchestrator` and `CodeGraphDb` symbol storage language-agnostic by extending the `ILanguageParser` contract. Parsers can individually flag symbols as mergeable/partial (`IsPartial = true`), delegating multi-file symbol declaration aggregation (C# `partial class`, TypeScript `interface` declaration merging, etc.) to the individual parser implementations while the core DB engine transparently returns location line-range arrays (`Locations: [{ File, StartLine, EndLine }]`).
+- **Description**: Keep core `IndexOrchestrator` and `CodeAtlasDb` symbol storage language-agnostic by extending the `ILanguageParser` contract. Parsers can individually flag symbols as mergeable/partial (`IsPartial = true`), delegating multi-file symbol declaration aggregation (C# `partial class`, TypeScript `interface` declaration merging, etc.) to the individual parser implementations while the core DB engine transparently returns location line-range arrays (`Locations: [{ File, StartLine, EndLine }]`).
 - **Goal**: Enable multi-file symbol aggregation without adding language-specific branching or hardcoded logic to the core index engine.
 
 ### 10. Worktree Path Mismatch Warning & Safety Guardrails

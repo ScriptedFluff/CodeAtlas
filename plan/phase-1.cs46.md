@@ -1,5 +1,5 @@
-# Phase 1 — Core Engine & Tree-sitter Parsers
-## Detailed Implementation Plan — CodeGraphMcp (C# / .NET 9)
+﻿# Phase 1 — Core Engine & Tree-sitter Parsers
+## Detailed Implementation Plan — CodeAtlas (C# / .NET 9)
 
 **Version:** 1.0.0  
 **Phase:** 1 of 4  
@@ -12,7 +12,7 @@
 
 ## Objective
 
-Produce a working, AOT-compiled CLI binary (`CodeGraphMcp.exe`) that can:
+Produce a working, AOT-compiled CLI binary (`CodeAtlas.exe`) that can:
 
 1. Accept a repository path as input
 2. Walk the directory tree, dispatch files to language-specific Tree-sitter parsers
@@ -28,10 +28,10 @@ Phase 1 is the bedrock every later phase depends on. Get this right and the rest
 ## Phase 1 Exit Criteria (Non-Negotiable)
 
 - [ ] `dotnet publish -r win-x64 -p:PublishAot=true` produces a single working executable — no runtime errors
-- [ ] `.\CodeGraphMcp.exe index D:\Projects\C#\repositorydb --store-local` completes without exceptions
+- [ ] `.\CodeAtlas.exe index D:\Projects\C#\repositorydb --store-local` completes without exceptions
 - [ ] SQLite `symbols` table contains correct symbol names, types, file paths, and line numbers — verified by manual spot check
 - [ ] Indexing the same repo twice produces identical row counts (upsert idempotency)
-- [ ] `.\CodeGraphMcp.exe query <SymbolName>` returns a formatted result from the DB
+- [ ] `.\CodeAtlas.exe query <SymbolName>` returns a formatted result from the DB
 - [ ] No `NullReferenceException` escapes to the console — all parser errors are caught, logged, and skipped
 
 ---
@@ -40,10 +40,10 @@ Phase 1 is the bedrock every later phase depends on. Get this right and the rest
 
 ```
 D:\Projects\C#\repositorydb\
-├── CodeGraphMcp.sln
+├── CodeAtlas.sln
 ├── src\
-│   └── CodeGraphMcp\
-│       ├── CodeGraphMcp.csproj            ← AOT-configured project file
+│   └── CodeAtlas\
+│       ├── CodeAtlas.csproj            ← AOT-configured project file
 │       ├── Program.cs                     ← CLI entry point (System.CommandLine)
 │       ├── Config\
 │       │   └── StorageConfig.cs           ← DB path resolution (hash, flags, env)
@@ -52,7 +52,7 @@ D:\Projects\C#\repositorydb\
 │       │   ├── SymbolType.cs              ← Enum: Class, Interface, Method, etc.
 │       │   └── IndexResult.cs             ← Summary returned after indexing
 │       ├── Db\
-│       │   ├── CodeGraphDb.cs             ← Connection factory + migration runner
+│       │   ├── CodeAtlasDb.cs             ← Connection factory + migration runner
 │       │   ├── Migrations\
 │       │   │   ├── M001_InitialSchema.cs  ← All 5 tables
 │       │   │   └── M002_Indices.cs        ← Performance indices
@@ -68,8 +68,8 @@ D:\Projects\C#\repositorydb\
 │       └── Indexer\
 │           └── IndexOrchestrator.cs       ← Directory walk + dispatch + batch write
 ├── tests\
-│   └── CodeGraphMcp.Tests\
-│       ├── CodeGraphMcp.Tests.csproj
+│   └── CodeAtlas.Tests\
+│       ├── CodeAtlas.Tests.csproj
 │       ├── Fixtures\
 │       │   ├── SampleClass.cs             ← Known symbols for assertion
 │       │   └── SampleComponent.ts         ← Known symbols for assertion
@@ -89,25 +89,25 @@ D:\Projects\C#\repositorydb\
 
 ```powershell
 # Create solution
-dotnet new sln -n CodeGraphMcp -o D:\Projects\C#\repositorydb
+dotnet new sln -n CodeAtlas -o D:\Projects\C#\repositorydb
 
 # Create main project
-dotnet new console -n CodeGraphMcp -o D:\Projects\C#\repositorydb\src\CodeGraphMcp
-dotnet sln D:\Projects\C#\repositorydb\CodeGraphMcp.sln add `
-    D:\Projects\C#\repositorydb\src\CodeGraphMcp\CodeGraphMcp.csproj
+dotnet new console -n CodeAtlas -o D:\Projects\C#\repositorydb\src\CodeAtlas
+dotnet sln D:\Projects\C#\repositorydb\CodeAtlas.sln add `
+    D:\Projects\C#\repositorydb\src\CodeAtlas\CodeAtlas.csproj
 
 # Create test project
-dotnet new xunit -n CodeGraphMcp.Tests -o D:\Projects\C#\repositorydb\tests\CodeGraphMcp.Tests
-dotnet sln D:\Projects\C#\repositorydb\CodeGraphMcp.sln add `
-    D:\Projects\C#\repositorydb\tests\CodeGraphMcp.Tests\CodeGraphMcp.Tests.csproj
+dotnet new xunit -n CodeAtlas.Tests -o D:\Projects\C#\repositorydb\tests\CodeAtlas.Tests
+dotnet sln D:\Projects\C#\repositorydb\CodeAtlas.sln add `
+    D:\Projects\C#\repositorydb\tests\CodeAtlas.Tests\CodeAtlas.Tests.csproj
 ```
 
 ### 1.2 — NuGet Packages
 
-Add to `src\CodeGraphMcp\CodeGraphMcp.csproj`:
+Add to `src\CodeAtlas\CodeAtlas.csproj`:
 
 ```powershell
-cd D:\Projects\C#\repositorydb\src\CodeGraphMcp
+cd D:\Projects\C#\repositorydb\src\CodeAtlas
 
 dotnet add package System.CommandLine --prerelease
 dotnet add package Microsoft.Data.Sqlite
@@ -124,18 +124,18 @@ dotnet add package Serilog.Sinks.Console
 dotnet add package Serilog.Sinks.File
 ```
 
-Add to `tests\CodeGraphMcp.Tests\CodeGraphMcp.Tests.csproj`:
+Add to `tests\CodeAtlas.Tests\CodeAtlas.Tests.csproj`:
 
 ```powershell
-cd D:\Projects\C#\repositorydb\tests\CodeGraphMcp.Tests
+cd D:\Projects\C#\repositorydb\tests\CodeAtlas.Tests
 
-dotnet add reference ..\..\src\CodeGraphMcp\CodeGraphMcp.csproj
+dotnet add reference ..\..\src\CodeAtlas\CodeAtlas.csproj
 dotnet add package Microsoft.Data.Sqlite
 ```
 
 ### 1.3 — Project File Configuration
 
-`CodeGraphMcp.csproj` must be AOT-ready from the start. Catching trim issues late is painful.
+`CodeAtlas.csproj` must be AOT-ready from the start. Catching trim issues late is painful.
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -153,7 +153,7 @@ dotnet add package Microsoft.Data.Sqlite
     <StripSymbols>true</StripSymbols>
 
     <!-- Trim analysis -->
-    <TrimmerRootAssembly Include="CodeGraphMcp" />
+    <TrimmerRootAssembly Include="CodeAtlas" />
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
   </PropertyGroup>
 
@@ -168,9 +168,9 @@ The CLI must support three subcommands. Only `index` and `query` are wired in Ph
 
 ```csharp
 using System.CommandLine;
-using CodeGraphMcp.Config;
-using CodeGraphMcp.Db;
-using CodeGraphMcp.Indexer;
+using CodeAtlas.Core.Config;
+using CodeAtlas.Core.Db;
+using CodeAtlas.Core.Indexer;
 using Microsoft.Extensions.Logging;
 
 var repoArgument = new Argument<DirectoryInfo>("repo-path", "Path to the repository root to index");
@@ -185,7 +185,7 @@ indexCommand.AddOption(storeLocalOption);
 indexCommand.SetHandler(async (repo, dbDir, storeLocal) =>
 {
     var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, repo.FullName);
-    using var db = new CodeGraphDb(dbPath);
+    using var db = new CodeAtlasDb(dbPath);
     db.Migrate();
     var orchestrator = new IndexOrchestrator(db);
     var result = await orchestrator.IndexAsync(repo.FullName);
@@ -203,7 +203,7 @@ queryCommand.SetHandler((symbol, dbDir, storeLocal) =>
     // Require --store-local or --db-dir so query knows which DB to open.
     // For now, require --store-local as default during Phase 1 testing.
     var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, Directory.GetCurrentDirectory());
-    using var db = new CodeGraphDb(dbPath);
+    using var db = new CodeAtlasDb(dbPath);
     db.Migrate();
     var results = db.Symbols.FindByName(symbol);
     foreach (var sym in results)
@@ -215,7 +215,7 @@ var serveCommand = new Command("serve", "Start the MCP server (Phase 3)");
 serveCommand.SetHandler(() => Console.WriteLine("MCP server is not yet implemented (Phase 3)."));
 
 // ── root ───────────────────────────────────────────────────────────────────
-var rootCommand = new RootCommand("CodeGraphMcp — local code knowledge graph engine");
+var rootCommand = new RootCommand("CodeAtlas — local code knowledge graph engine");
 rootCommand.AddCommand(indexCommand);
 rootCommand.AddCommand(queryCommand);
 rootCommand.AddCommand(serveCommand);
@@ -229,7 +229,7 @@ return await rootCommand.InvokeAsync(args);
 using System.Security.Cryptography;
 using System.Text;
 
-namespace CodeGraphMcp.Config;
+namespace CodeAtlas.Core.Config;
 
 public static class StorageConfig
 {
@@ -255,7 +255,7 @@ public static class StorageConfig
             var localDir = Path.Combine(normalisedRepo, ".agent-index");
             Directory.CreateDirectory(localDir);
             AppendGitIgnore(normalisedRepo);
-            return Path.Combine(localDir, "code_graph.db");
+            return Path.Combine(localDir, "atlas.db");
         }
 
         // Default: global LOCALAPPDATA store
@@ -271,7 +271,7 @@ public static class StorageConfig
     private static void AppendGitIgnore(string repoPath)
     {
         var gitIgnorePath = Path.Combine(repoPath, ".gitignore");
-        const string entry = "\n# CodeGraphMcp local index\n.agent-index/\n";
+        const string entry = "\n# CodeAtlas local index\n.agent-index/\n";
 
         if (!File.Exists(gitIgnorePath))
         {
@@ -289,11 +289,11 @@ public static class StorageConfig
 ### 1.6 — ENG-01 Stability Gate
 
 ```powershell
-dotnet run --project src\CodeGraphMcp -- index --help
+dotnet run --project src\CodeAtlas -- index --help
 # Expected: prints usage with <repo-path>, --db-dir, --store-local
 
-dotnet publish src\CodeGraphMcp -r win-x64 -p:PublishAot=true -p:StripSymbols=true -o publish\
-# Expected: publish\ contains CodeGraphMcp.exe (~10-30MB) and e_sqlite3.dll
+dotnet publish src\CodeAtlas -r win-x64 -p:PublishAot=true -p:StripSymbols=true -o publish\
+# Expected: publish\ contains CodeAtlas.exe (~10-30MB) and e_sqlite3.dll
 ```
 
 ---
@@ -304,7 +304,7 @@ dotnet publish src\CodeGraphMcp -r win-x64 -p:PublishAot=true -p:StripSymbols=tr
 
 **`Models/SymbolType.cs`**
 ```csharp
-namespace CodeGraphMcp.Models;
+namespace CodeAtlas.Models;
 
 public enum SymbolType
 {
@@ -323,7 +323,7 @@ public enum SymbolType
 
 **`Models/Symbol.cs`**
 ```csharp
-namespace CodeGraphMcp.Models;
+namespace CodeAtlas.Models;
 
 public sealed record Symbol
 {
@@ -344,7 +344,7 @@ public sealed record Symbol
 
 **`Models/IndexResult.cs`**
 ```csharp
-namespace CodeGraphMcp.Models;
+namespace CodeAtlas.Models;
 
 public sealed record IndexResult(int FilesProcessed, int SymbolsWritten, long ElapsedMs);
 ```
@@ -353,9 +353,9 @@ public sealed record IndexResult(int FilesProcessed, int SymbolsWritten, long El
 
 **`Parser/ILanguageParser.cs`**
 ```csharp
-using CodeGraphMcp.Models;
+using CodeAtlas.Models;
 
-namespace CodeGraphMcp.Parser;
+namespace CodeAtlas.Parser;
 
 public interface ILanguageParser
 {
@@ -380,11 +380,11 @@ public interface ILanguageParser
 The C# parser uses Tree-sitter S-expression queries to capture declarations. The query captures are named by convention (`@class.def`, `@method.name`, etc.) so the extraction loop can discriminate by capture name prefix.
 
 ```csharp
-using CodeGraphMcp.Models;
+using CodeAtlas.Models;
 using TreeSitter;
 using TreeSitter.Language.CSharp;
 
-namespace CodeGraphMcp.Parser;
+namespace CodeAtlas.Parser;
 
 public sealed class CSharpParser : ILanguageParser
 {
@@ -502,11 +502,11 @@ public sealed class CSharpParser : ILanguageParser
 ### 2.4 — TypeScript Parser (`Parser/TypeScriptParser.cs`)
 
 ```csharp
-using CodeGraphMcp.Models;
+using CodeAtlas.Models;
 using TreeSitter;
 using TreeSitter.Language.TypeScript;
 
-namespace CodeGraphMcp.Parser;
+namespace CodeAtlas.Parser;
 
 public sealed class TypeScriptParser : ILanguageParser
 {
@@ -584,8 +584,8 @@ These stubs allow `IndexOrchestrator` to register all 4 languages without crashi
 
 ```csharp
 // Parser/HtmlParser.cs
-using CodeGraphMcp.Models;
-namespace CodeGraphMcp.Parser;
+using CodeAtlas.Models;
+namespace CodeAtlas.Parser;
 
 public sealed class HtmlParser : ILanguageParser
 {
@@ -595,8 +595,8 @@ public sealed class HtmlParser : ILanguageParser
 }
 
 // Parser/PowerShellParser.cs
-using CodeGraphMcp.Models;
-namespace CodeGraphMcp.Parser;
+using CodeAtlas.Models;
+namespace CodeAtlas.Parser;
 
 public sealed class PowerShellParser : ILanguageParser
 {
@@ -612,14 +612,14 @@ The orchestrator is the integration point. It holds the list of parsers, walks t
 
 ```csharp
 using System.Diagnostics;
-using CodeGraphMcp.Db;
-using CodeGraphMcp.Models;
-using CodeGraphMcp.Parser;
+using CodeAtlas.Core.Db;
+using CodeAtlas.Models;
+using CodeAtlas.Parser;
 using Microsoft.Extensions.Logging;
 
-namespace CodeGraphMcp.Indexer;
+namespace CodeAtlas.Core.Indexer;
 
-public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>? logger = null)
+public sealed class IndexOrchestrator(CodeAtlasDb db, ILogger<IndexOrchestrator>? logger = null)
 {
     // Directories to skip — treat as a lookup set for O(1) check
     private static readonly HashSet<string> IgnoredDirs = new(StringComparer.OrdinalIgnoreCase)
@@ -723,10 +723,10 @@ public sealed class IndexOrchestrator(CodeGraphDb db, ILogger<IndexOrchestrator>
 ### 2.7 — ENG-02 Stability Gate
 
 ```powershell
-.\CodeGraphMcp.exe index D:\Projects\C#\repositorydb --store-local
+.\CodeAtlas.exe index D:\Projects\C#\repositorydb --store-local
 
 # Then verify:
-sqlite3 "D:\Projects\C#\repositorydb\.agent-index\code_graph.db" `
+sqlite3 "D:\Projects\C#\repositorydb\.agent-index\atlas.db" `
     "SELECT symbol_type, symbol_name, file_path, start_line FROM symbols LIMIT 30;"
 
 # Expect: real symbol names, matching file paths, sensible line numbers
@@ -737,23 +737,23 @@ sqlite3 "D:\Projects\C#\repositorydb\.agent-index\code_graph.db" `
 
 ## ENG-03 — SQLite Schema & Migrations (16 hours)
 
-### 3.1 — Connection Factory (`Db/CodeGraphDb.cs`)
+### 3.1 — Connection Factory (`Db/CodeAtlasDb.cs`)
 
 ```csharp
 using Microsoft.Data.Sqlite;
 using SimpleMigrations;
 using SimpleMigrations.DatabaseProvider;
-using CodeGraphMcp.Db.Queries;
+using CodeAtlas.Core.Db.Queries;
 
-namespace CodeGraphMcp.Db;
+namespace CodeAtlas.Core.Db;
 
-public sealed class CodeGraphDb : IDisposable
+public sealed class CodeAtlasDb : IDisposable
 {
     private readonly SqliteConnection _connection;
     public SymbolQueries Symbols { get; }
     public ReferenceQueries References { get; }
 
-    public CodeGraphDb(string dbPath)
+    public CodeAtlasDb(string dbPath)
     {
         // Ensure the directory exists before SQLite tries to create the file
         var dir = Path.GetDirectoryName(dbPath);
@@ -789,7 +789,7 @@ public sealed class CodeGraphDb : IDisposable
 ```csharp
 using SimpleMigrations;
 
-namespace CodeGraphMcp.Db.Migrations;
+namespace CodeAtlas.Core.Db.Migrations;
 
 [Migration(1, "Initial schema")]
 public class M001_InitialSchema : Migration
@@ -863,7 +863,7 @@ public class M001_InitialSchema : Migration
 ```csharp
 using SimpleMigrations;
 
-namespace CodeGraphMcp.Db.Migrations;
+namespace CodeAtlas.Core.Db.Migrations;
 
 [Migration(2, "Performance indices")]
 public class M002_Indices : Migration
@@ -900,9 +900,9 @@ All SQL lives here. No inline SQL in orchestrators, parsers, or CLI handlers.
 
 ```csharp
 using Microsoft.Data.Sqlite;
-using CodeGraphMcp.Models;
+using CodeAtlas.Models;
 
-namespace CodeGraphMcp.Db.Queries;
+namespace CodeAtlas.Core.Db.Queries;
 
 public sealed class SymbolQueries(SqliteConnection connection)
 {
@@ -1032,7 +1032,7 @@ public sealed class SymbolQueries(SqliteConnection connection)
 ```csharp
 using Microsoft.Data.Sqlite;
 
-namespace CodeGraphMcp.Db.Queries;
+namespace CodeAtlas.Core.Db.Queries;
 
 /// <summary>
 /// Placeholder — populated in Phase 3 (MCP-02: FindSymbolCallers).
@@ -1047,14 +1047,14 @@ public sealed class ReferenceQueries(SqliteConnection connection)
 
 ```powershell
 # Run index twice — verify idempotency
-.\CodeGraphMcp.exe index D:\Projects\C#\repositorydb --store-local
-.\CodeGraphMcp.exe index D:\Projects\C#\repositorydb --store-local
+.\CodeAtlas.exe index D:\Projects\C#\repositorydb --store-local
+.\CodeAtlas.exe index D:\Projects\C#\repositorydb --store-local
 
 # Count rows — must be identical both times
-sqlite3 "D:\Projects\C#\repositorydb\.agent-index\code_graph.db" "SELECT COUNT(*) FROM symbols;"
+sqlite3 "D:\Projects\C#\repositorydb\.agent-index\atlas.db" "SELECT COUNT(*) FROM symbols;"
 
 # Check no duplicates
-sqlite3 "D:\Projects\C#\repositorydb\.agent-index\code_graph.db" `
+sqlite3 "D:\Projects\C#\repositorydb\.agent-index\atlas.db" `
     "SELECT symbol_name, file_path, COUNT(*) AS c FROM symbols GROUP BY symbol_name, file_path HAVING c > 1 LIMIT 10;"
 # Expected: 0 rows
 ```
@@ -1065,7 +1065,7 @@ sqlite3 "D:\Projects\C#\repositorydb\.agent-index\code_graph.db" `
 
 ### Test Fixtures
 
-**`tests/CodeGraphMcp.Tests/Fixtures/SampleClass.cs`**
+**`tests/CodeAtlas.Tests/Fixtures/SampleClass.cs`**
 ```csharp
 namespace Fixtures.Sample;
 
@@ -1085,7 +1085,7 @@ public interface IPersonRepository
 }
 ```
 
-**`tests/CodeGraphMcp.Tests/Fixtures/SampleComponent.ts`**
+**`tests/CodeAtlas.Tests/Fixtures/SampleComponent.ts`**
 ```typescript
 export interface UserProfile {
     id: number;
@@ -1101,14 +1101,14 @@ export class UserService {
 type UserId = number;
 ```
 
-### Parser Tests (`tests/CodeGraphMcp.Tests/ParserTests.cs`)
+### Parser Tests (`tests/CodeAtlas.Tests/ParserTests.cs`)
 
 ```csharp
-using CodeGraphMcp.Models;
-using CodeGraphMcp.Parser;
+using CodeAtlas.Models;
+using CodeAtlas.Parser;
 using Xunit;
 
-namespace CodeGraphMcp.Tests;
+namespace CodeAtlas.Tests;
 
 public class CSharpParserTests
 {
@@ -1196,7 +1196,7 @@ public class TypeScriptParserTests
 Day 1-2: ENG-01 — Solution scaffold, packages, csproj, StorageConfig, Program.cs CLI skeleton
          → Gate: dotnet publish AOT succeeds, --help prints correctly
 
-Day 3-5: ENG-03 — CodeGraphDb, migrations M001+M002, SymbolQueries (write path)
+Day 3-5: ENG-03 — CodeAtlasDb, migrations M001+M002, SymbolQueries (write path)
          → Gate: fresh DB creates all 5 tables with correct schema
 
 Day 6-10: ENG-02 — Models, ILanguageParser, CSharpParser, TypeScriptParser, stubs, IndexOrchestrator
@@ -1214,7 +1214,7 @@ Day 13-14: Buffer — AOT trim warning cleanup, edge cases (empty files, binary 
 
 | Deliverable | Description |
 | :--- | :--- |
-| `CodeGraphMcp.exe` | Single-file win-x64 native executable (AOT compiled) |
+| `CodeAtlas.exe` | Single-file win-x64 native executable (AOT compiled) |
 | SQLite schema | 5 tables, 6 indices, versioned via `SimpleMigrations` |
 | C# parser | Full symbol extraction (class, interface, struct, enum, method, property) |
 | TypeScript parser | Full symbol extraction (interface, class, function, method, type alias) |
@@ -1222,4 +1222,4 @@ Day 13-14: Buffer — AOT trim warning cleanup, edge cases (empty files, binary 
 | xUnit tests | Parser correctness tests against known fixtures |
 | `index` CLI command | Full directory walk, parallel parsing, transactional batch writes |
 | `query` CLI command | Symbol lookup by name with formatted output |
-| Phase 2 readiness | `CodeGraphDb`, `SymbolQueries.UpsertFile`, and `IndexOrchestrator` designed for delta upgrade |
+| Phase 2 readiness | `CodeAtlasDb`, `SymbolQueries.UpsertFile`, and `IndexOrchestrator` designed for delta upgrade |

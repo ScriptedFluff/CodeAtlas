@@ -1,4 +1,4 @@
-# Local Git-Aware MCP Code Knowledge Graph
+﻿# Local Git-Aware MCP Code Knowledge Graph
 ## System Architecture & Technical Implementation Blueprint
 
 **Version:** 1.0.0  
@@ -40,11 +40,11 @@ The **MCP Code Knowledge Graph Engine** resolves this by introducing a standalon
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            DATA STORAGE TIER                                │
 │                                                                             │
-│  • Primary DB: SQLite Relational Knowledge Graph (`code_graph.db`)          │
+│  • Primary DB: SQLite Relational Knowledge Graph (`atlas.db`)          │
 │  • In-Memory Buffer: Live Uncommitted/Staged File Parser                    │
 │  • Storage Modes:                                                           │
 │    - Default: `%LOCALAPPDATA%/CodeGraph/dbs/<project_hash>.db`             │
-│    - Local (`--store-local`): `<repo>/.agent-index/code_graph.db`           │
+│    - Local (`--store-local`): `<repo>/.agent-index/atlas.db`           │
 │    - Custom (`--db-dir <path>`): User-specified directory                   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -116,7 +116,7 @@ The engine resolves database file storage in strict order of precedence:
 | Priority | Flag / Trigger | Behavior | Target Path |
 | :--- | :--- | :--- | :--- |
 | **1 (Highest)** | `--db-dir <path>` | Custom directory override | `<path>/<project_hash>.db` |
-| **2** | `--store-local` (`-l`) | Store directly inside repo root | `<repo_root>/.agent-index/code_graph.db` |
+| **2** | `--store-local` (`-l`) | Store directly inside repo root | `<repo_root>/.agent-index/atlas.db` |
 | **3 (Default)** | *(None)* | Global user data (Zero repo pollution) | **Win:** `%LOCALAPPDATA%\CodeGraph\dbs\<hash>.db`<br>**Linux:** `~/.local/share/codegraph/dbs/<hash>.db` |
 
 ---

@@ -1,7 +1,7 @@
-# Architectural Plan: Modular / Drop-in Parsers for CodeGraphMcp
+﻿# Architectural Plan: Modular / Drop-in Parsers for CodeAtlas
 
 **Model Tag**: `g37` (Gemini 3.7 Flash)  
-**Target Path**: `D:\Projects\C#\CodeGraphMcp\plan\moduler-dropin-parsers.plan.g37.md`  
+**Target Path**: `D:\Projects\C#\CodeAtlas\plan\moduler-dropin-parsers.plan.g37.md`  
 **Status**: Proposal / Architectural Plan  
 **Target Architecture**: Decoupled, folder-isolated drop-in parser plugins with multi-tier directory resolution, runtime `AssemblyLoadContext` isolation, anti-shadowing security policies, and CLI lifecycle management.
 
@@ -9,20 +9,20 @@
 
 ## 🎯 1. Overview & Architectural Motivation
 
-Currently, `CodeGraphMcp` embeds all language parsers (C#, TypeScript, JavaScript, HTML, PowerShell, JSON, YAML, CSS) directly inside the `CodeGraphMcp.Core` class library. While straightforward for initial development, this tight coupling presents several long-term limitations:
+Currently, `CodeAtlas` embeds all language parsers (C#, TypeScript, JavaScript, HTML, PowerShell, JSON, YAML, CSS) directly inside the `CodeAtlas.Core` class library. While straightforward for initial development, this tight coupling presents several long-term limitations:
 
 1. **Monolithic Dependency Footprint**: Core references all AST dependencies (Roslyn, TreeSitter runtimes, etc.) regardless of whether a user or repository needs them.
-2. **Zero Third-Party Extensibility**: Adding support for a new language (e.g., Python, Go, Rust, Kotlin, SQL) requires modifying `CodeGraphMcp.Core` source code and recompiling the entire solution.
+2. **Zero Third-Party Extensibility**: Adding support for a new language (e.g., Python, Go, Rust, Kotlin, SQL) requires modifying `CodeAtlas.Core` source code and recompiling the entire solution.
 3. **No Dynamic Parser Lifecycle**: Users cannot disable unneeded parsers, test experimental parser builds, or swap out parsing implementations without modifying code.
 4. **Binary Shadowing & Security Risks**: If arbitrary drop-in assemblies are discovered from unprivileged locations (like `%LOCALAPPDATA%`), malicious scripts or dependencies could hijack indexing logic unless guarded by strict security policies.
 
 ### Core Objectives
 * **Isolated Parser Assemblies**: Each parser lives in its own standalone `.csproj` and compiles into a dedicated subfolder containing its primary DLL and dependencies.
 * **Dual-Folder Non-Destructive Management**: Enable/disable parsers by moving folders between `Parsers/` (active) and `DisabledParsers/` (inactive).
-* **Multi-Tier Directory Resolution**: Support user profile storage (`%LOCALAPPDATA%`), portable app-relative storage (`<AppBaseDir>`), and environment variable overrides (`CODEGRAPH_PARSERS_DIR`).
+* **Multi-Tier Directory Resolution**: Support user profile storage (`%LOCALAPPDATA%`), portable app-relative storage (`<AppBaseDir>`), and environment variable overrides (`CODEATLAS_PARSERS_DIR`).
 * **Anti-Hijacking Security Policy**: Configurable override policy (`Strict`, `AllowAll`, `AllowList`) preventing unprivileged user folders from shadowing secure system/app binaries.
 * **Runtime Isolation via `AssemblyLoadContext`**: Dedicated ALC per parser folder to prevent assembly locking and dependency version collisions.
-* **CLI Lifecycle Management**: Subcommands in `CodeGraphMcp.Cli` (`codegraph parsers list`, `enable`, `disable`, `info`).
+* **CLI Lifecycle Management**: Subcommands in `CodeAtlas.Cli` (`codegraph parsers list`, `enable`, `disable`, `info`).
 
 ---
 
@@ -30,33 +30,33 @@ Currently, `CodeGraphMcp` embeds all language parsers (C#, TypeScript, JavaScrip
 
 ### Solution Layout
 ```
-CodeGraphMcp.slnx
+CodeAtlas.slnx
 ├── src/
-│   ├── CodeGraphMcp.Core/             # Shared contracts & indexing engine
+│   ├── CodeAtlas.Core/             # Shared contracts & indexing engine
 │   │   ├── Parser/                    # ILanguageParser, ParserMetadata, IParserRegistry
 │   │   ├── Plugins/                   # AssemblyLoadContext, Discovery & Security Resolution
 │   │   └── Indexer/                   # IndexOrchestrator consuming IParserRegistry
 │   │
-│   ├── CodeGraphMcp.Server/           # MCP stdio host daemon
+│   ├── CodeAtlas.Mcp/           # MCP stdio host daemon
 │   │   └── Mcp/Tools/                 # GetSupportedLanguagesTool dynamically querying registry
 │   │
-│   ├── CodeGraphMcp.Cli/              # CLI executable
+│   ├── CodeAtlas.Cli/              # CLI executable
 │   │   └── Commands/Parsers/          # 'parsers list', 'enable', 'disable', 'info'
 │   │
 │   └── Parsers/                       # Standalone drop-in parser projects
 │       ├── Directory.Build.props      # Shared build properties & Core reference
 │       ├── Directory.Build.targets    # Auto-copy output to dev Parsers/ folder
-│       ├── CodeGraphMcp.Parsers.CSharp/
-│       ├── CodeGraphMcp.Parsers.TypeScript/
-│       ├── CodeGraphMcp.Parsers.JavaScript/
-│       ├── CodeGraphMcp.Parsers.Html/
-│       ├── CodeGraphMcp.Parsers.PowerShell/
-│       ├── CodeGraphMcp.Parsers.Json/
-│       ├── CodeGraphMcp.Parsers.Yaml/
-│       └── CodeGraphMcp.Parsers.Css/
+│       ├── CodeAtlas.Parsers.CSharp/
+│       ├── CodeAtlas.Parsers.TypeScript/
+│       ├── CodeAtlas.Parsers.JavaScript/
+│       ├── CodeAtlas.Parsers.Html/
+│       ├── CodeAtlas.Parsers.PowerShell/
+│       ├── CodeAtlas.Parsers.Json/
+│       ├── CodeAtlas.Parsers.Yaml/
+│       └── CodeAtlas.Parsers.Css/
 │
 └── tests/
-    └── CodeGraphMcp.Tests/            # Unit & integration tests for ALC loader & security
+    └── CodeAtlas.Tests/            # Unit & integration tests for ALC loader & security
 ```
 
 ### Runtime Directory Hierarchy
@@ -64,17 +64,17 @@ CodeGraphMcp.slnx
 <Storage Root>/
 ├── Parsers/                           # ACTIVE: Parsers loaded at startup
 │   ├── CSharp/
-│   │   ├── CodeGraphMcp.Parsers.CSharp.dll
+│   │   ├── CodeAtlas.Parsers.CSharp.dll
 │   │   ├── Microsoft.CodeAnalysis.CSharp.dll
 │   │   └── parser.json (optional metadata)
 │   ├── TypeScript/
-│   │   ├── CodeGraphMcp.Parsers.TypeScript.dll
+│   │   ├── CodeAtlas.Parsers.TypeScript.dll
 │   │   └── TreeSitter.Bindings.dll
 │   └── ...
 │
 └── DisabledParsers/                   # INACTIVE: Ignored by runtime indexer
     └── Python/
-        └── CodeGraphMcp.Parsers.Python.dll
+        └── CodeAtlas.Parsers.Python.dll
 ```
 
 ---
@@ -86,8 +86,8 @@ When the host application initializes, it scans directories in the following pri
 
 | Tier | Source | Default Windows Path | Default Linux/macOS Path | Access Level |
 | :--- | :--- | :--- | :--- | :--- |
-| **Tier 1 (Override)** | Environment Var | `$env:CODEGRAPH_PARSERS_DIR` | `$CODEGRAPH_PARSERS_DIR` | Custom / CI-CD |
-| **Tier 2 (Primary)** | User Data | `%LOCALAPPDATA%\CodeGraphMcp\Parsers` | `~/.local/share/codegraph/parsers` | Unprivileged / Per-User |
+| **Tier 1 (Override)** | Environment Var | `$env:CODEATLAS_PARSERS_DIR` | `$CODEATLAS_PARSERS_DIR` | Custom / CI-CD |
+| **Tier 2 (Primary)** | User Data | `%LOCALAPPDATA%\CodeAtlas\Parsers` | `~/.local/share/codegraph/parsers` | Unprivileged / Per-User |
 | **Tier 3 (Fallback)** | App Base Directory | `<AppBaseDir>\Parsers` | `<AppBaseDir>/parsers` | Admin / System / Portable |
 
 ### Security & Anti-Shadowing Policy
@@ -137,9 +137,9 @@ flowchart TD
 
 ## 🧩 4. Core Abstractions & Plugin Loader Specification
 
-### 4.1 Parser Contract (`CodeGraphMcp.Core`)
+### 4.1 Parser Contract (`CodeAtlas.Core`)
 ```csharp
-namespace CodeGraphMcp.Parser;
+namespace CodeAtlas.Parser;
 
 public interface ILanguageParser
 {
@@ -166,7 +166,7 @@ public sealed record ParserMetadata(
 Each parser folder is loaded inside its own collectible `AssemblyLoadContext` with an `AssemblyDependencyResolver` to ensure isolated resolution of native dependencies and transitive assemblies:
 
 ```csharp
-namespace CodeGraphMcp.Plugins;
+namespace CodeAtlas.Core.Plugins;
 
 public sealed class ParserLoadContext : AssemblyLoadContext
 {
@@ -181,7 +181,7 @@ public sealed class ParserLoadContext : AssemblyLoadContext
     protected override Assembly? Load(AssemblyName assemblyName)
     {
         // Share Core abstractions with host
-        if (assemblyName.Name == "CodeGraphMcp.Core")
+        if (assemblyName.Name == "CodeAtlas.Core")
             return null;
 
         string? assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
@@ -216,11 +216,11 @@ Discovered Language Parsers:
 
 STATUS               ID           LANGUAGE     VERSION  EXTENSIONS            SOURCE   PATH
 ----------------------------------------------------------------------------------------------------------------------
-[ACTIVE]             csharp       csharp       1.0.0    .cs                   [App]    C:\Program Files\CodeGraphMcp\Parsers\CSharp
-[ACTIVE (OVERRIDE)]  typescript   typescript   2.1.0    .ts,.tsx,.cts,.mts    [User]   %LOCALAPPDATA%\CodeGraphMcp\Parsers\TypeScript
-[BLOCKED (SHADOW)]   python       python       0.9.0    .py                   [User]   %LOCALAPPDATA%\CodeGraphMcp\Parsers\Python
+[ACTIVE]             csharp       csharp       1.0.0    .cs                   [App]    C:\Program Files\CodeAtlas\Parsers\CSharp
+[ACTIVE (OVERRIDE)]  typescript   typescript   2.1.0    .ts,.tsx,.cts,.mts    [User]   %LOCALAPPDATA%\CodeAtlas\Parsers\TypeScript
+[BLOCKED (SHADOW)]   python       python       0.9.0    .py                   [User]   %LOCALAPPDATA%\CodeAtlas\Parsers\Python
   └─ Reason: Shadowing blocked by 'Strict' security policy (App parser takes precedence)
-[DISABLED]           rust         rust         0.5.0    .rs                   [App]    C:\Program Files\CodeGraphMcp\DisabledParsers\Rust
+[DISABLED]           rust         rust         0.5.0    .rs                   [App]    C:\Program Files\CodeAtlas\DisabledParsers\Rust
 ```
 
 ---
@@ -240,7 +240,7 @@ To eliminate boilerplate across multiple parser projects, MSBuild properties are
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CodeGraphMcp.Core\CodeGraphMcp.Core.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\CodeAtlas.Core\CodeAtlas.Core.csproj" Private="false" ExcludeAssets="runtime" />
   </ItemGroup>
 </Project>
 ```
@@ -250,8 +250,8 @@ To eliminate boilerplate across multiple parser projects, MSBuild properties are
 <Project>
   <Target Name="CopyToDevParsersFolder" AfterTargets="Build">
     <PropertyGroup>
-      <ParserFolderTargetName>$(MSBuildProjectName.Replace('CodeGraphMcp.Parsers.', ''))</ParserFolderTargetName>
-      <TargetParserDir>$(SolutionDir)src\CodeGraphMcp.Cli\bin\$(Configuration)\net10.0\Parsers\$(ParserFolderTargetName)\</TargetParserDir>
+      <ParserFolderTargetName>$(MSBuildProjectName.Replace('CodeAtlas.Parsers.', ''))</ParserFolderTargetName>
+      <TargetParserDir>$(SolutionDir)src\CodeAtlas.Cli\bin\$(Configuration)\net10.0\Parsers\$(ParserFolderTargetName)\</TargetParserDir>
     </PropertyGroup>
     <ItemGroup>
       <ParserOutputFiles Include="$(TargetDir)**\*.*" />
@@ -267,14 +267,14 @@ To eliminate boilerplate across multiple parser projects, MSBuild properties are
 
 ## 🚀 7. Multi-Stage Implementation Plan
 
-### Stage 1: Core Contracts & Parser Registry Refactor (`CodeGraphMcp.Core`) [COMPLETED]
+### Stage 1: Core Contracts & Parser Registry Refactor (`CodeAtlas.Core`) [COMPLETED]
 - [x] Add `ParserMetadata` model and update `ILanguageParser` with metadata properties.
 - [x] Create `IParserRegistry` interface and `ParserRegistry` implementation.
 - [x] Implement `ParserDirectoryResolver` supporting Environment, User AppData, and AppBaseDir fallback paths.
 - [x] Implement `ParserSecurityPolicy` with `Strict`, `AllowAll`, and `AllowList` evaluation modes.
 - [x] Refactor `IndexOrchestrator`, `DeltaEngine`, `DirtyFileBuffer`, and `WorkspaceBufferManager` to consume `IParserRegistry` instead of hardcoded parser lists.
 
-### Stage 2: Dynamic Plugin Discovery & `AssemblyLoadContext` Engine (`CodeGraphMcp.Core`) [COMPLETED]
+### Stage 2: Dynamic Plugin Discovery & `AssemblyLoadContext` Engine (`CodeAtlas.Core`) [COMPLETED]
 - [x] Implement `ParserLoadContext` inheriting from `AssemblyLoadContext`.
 - [x] Build `DirectoryParserPluginLoader` scanning `Parsers/` folders, inspecting assemblies for `ILanguageParser` implementations, and instantiating them safely.
 - [x] Implement collision detection and security shadow-blocking diagnostics.
@@ -282,24 +282,24 @@ To eliminate boilerplate across multiple parser projects, MSBuild properties are
 ### Stage 3: Parser Migration into Isolated Projects (`src/Parsers/`) [COMPLETED]
 - [x] Create `src/Parsers/Directory.Build.props` and `Directory.Build.targets`.
 - [x] Extract existing parsers into dedicated `.csproj` projects:
-  - `src/Parsers/CodeGraphMcp.Parsers.CSharp`
-  - `src/Parsers/CodeGraphMcp.Parsers.TypeScript`
-  - `src/Parsers/CodeGraphMcp.Parsers.JavaScript`
-  - `src/Parsers/CodeGraphMcp.Parsers.Html`
-  - `src/Parsers/CodeGraphMcp.Parsers.PowerShell`
-  - `src/Parsers/CodeGraphMcp.Parsers.Json`
-  - `src/Parsers/CodeGraphMcp.Parsers.Yaml`
-  - `src/Parsers/CodeGraphMcp.Parsers.Css`
-- [x] Add all parser projects to `CodeGraphMcp.slnx`.
+  - `src/Parsers/CodeAtlas.Parsers.CSharp`
+  - `src/Parsers/CodeAtlas.Parsers.TypeScript`
+  - `src/Parsers/CodeAtlas.Parsers.JavaScript`
+  - `src/Parsers/CodeAtlas.Parsers.Html`
+  - `src/Parsers/CodeAtlas.Parsers.PowerShell`
+  - `src/Parsers/CodeAtlas.Parsers.Json`
+  - `src/Parsers/CodeAtlas.Parsers.Yaml`
+  - `src/Parsers/CodeAtlas.Parsers.Css`
+- [x] Add all parser projects to `CodeAtlas.slnx`.
 
-### Stage 4: CLI Management Commands (`CodeGraphMcp.Cli`) [COMPLETED]
-- [x] Implement `ParsersCommand` in `CodeGraphMcp.Cli.Commands`.
+### Stage 4: CLI Management Commands (`CodeAtlas.Cli`) [COMPLETED]
+- [x] Implement `ParsersCommand` in `CodeAtlas.Cli.Commands`.
 - [x] Implement `parsers list` table formatter with status tags (`ACTIVE`, `OVERRIDE`, `BLOCKED`, `DISABLED`).
 - [x] Implement `parsers enable <id>` and `parsers disable <id>` folder move operations with error handling for locked files.
 - [x] Implement `parsers info <id>` metadata viewer.
 
-### Stage 5: MCP Daemon Integration (`CodeGraphMcp.Server`) [COMPLETED]
-- [x] Wire `IParserRegistry` into `CodeGraphMcp.Server` dependency container.
+### Stage 5: MCP Daemon Integration (`CodeAtlas.Mcp`) [COMPLETED]
+- [x] Wire `IParserRegistry` into `CodeAtlas.Mcp` dependency container.
 - [x] Update `GetSupportedLanguagesTool` to return dynamically loaded parsers.
 - [x] Ensure MCP indexing requests seamlessly utilize active registry parsers.
 

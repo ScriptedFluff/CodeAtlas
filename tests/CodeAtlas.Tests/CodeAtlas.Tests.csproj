@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CodeAtlas.Abstractions\CodeAtlas.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\CodeAtlas.Core\CodeAtlas.Core.csproj" />
+    <ProjectReference Include="..\..\src\CodeAtlas.Mcp\CodeAtlas.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\CodeAtlas.Cli\CodeAtlas.Cli.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeAtlas.Parsers.CSharp\CodeAtlas.Parsers.CSharp.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeAtlas.Parsers.TypeScript\CodeAtlas.Parsers.TypeScript.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeAtlas.Parsers.JavaScript\CodeAtlas.Parsers.JavaScript.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeAtlas.Parsers.Html\CodeAtlas.Parsers.Html.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeAtlas.Parsers.PowerShell\CodeAtlas.Parsers.PowerShell.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeAtlas.Parsers.Json\CodeAtlas.Parsers.Json.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeAtlas.Parsers.Yaml\CodeAtlas.Parsers.Yaml.csproj" />
+    <ProjectReference Include="..\..\src\Parsers\CodeAtlas.Parsers.Css\CodeAtlas.Parsers.Css.csproj" />
+  </ItemGroup>
+
+</Project>

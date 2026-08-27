@@ -1,0 +1,43 @@
+﻿using System.ComponentModel;
+using CodeAtlas.Parser;
+using ModelContextProtocol.Server;
+
+namespace CodeAtlas.Mcp.Tools;
+
+public sealed record SupportedLanguageInfo(
+    string Language,
+    IReadOnlyList<string> FileExtensions);
+
+public sealed record SupportedLanguagesResult(
+    IReadOnlyList<SupportedLanguageInfo> SupportedLanguages);
+
+[McpServerToolType]
+public sealed class GetSupportedLanguagesTool
+{
+    private readonly IParserRegistry _parserRegistry;
+
+    public GetSupportedLanguagesTool(IParserRegistry parserRegistry)
+    {
+        _parserRegistry = parserRegistry;
+    }
+
+    public GetSupportedLanguagesTool(IReadOnlyList<ILanguageParser> parsers)
+        : this(new ParserRegistry(parsers))
+    {
+    }
+
+    [McpServerTool]
+    [Description("""
+        Lists the programming languages and file extensions currently supported by CodeAtlas.
+        Allows AI agents to dynamically discover indexing capabilities at session initialization.
+        """)]
+    public Task<SupportedLanguagesResult> GetSupportedLanguagesAsync(CancellationToken ct = default)
+    {
+        var languages = _parserRegistry.GetAllParsers()
+            .Select(p => new SupportedLanguageInfo(p.Language, p.FileExtensions))
+            .DistinctBy(l => l.Language, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return Task.FromResult(new SupportedLanguagesResult(languages));
+    }
+}

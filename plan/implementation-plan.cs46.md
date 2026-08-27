@@ -1,4 +1,4 @@
-# MCP Code Knowledge Graph Engine
+﻿# MCP Code Knowledge Graph Engine
 ## Implementation Plan — C# / .NET 9 Edition
 
 **Version:** 1.0.0  
@@ -49,16 +49,16 @@ Before writing a line of code, these are the definitive NuGet package choices.
 ## Project Structure
 
 ```
-CodeGraphMcp/
-├── CodeGraphMcp.sln
+CodeAtlas/
+├── CodeAtlas.sln
 ├── src/
-│   └── CodeGraphMcp/
-│       ├── CodeGraphMcp.csproj
+│   └── CodeAtlas/
+│       ├── CodeAtlas.csproj
 │       ├── Program.cs                      # CLI entrypoint (System.CommandLine)
 │       ├── Config/
 │       │   └── StorageConfig.cs            # DB path resolution logic
 │       ├── Db/
-│       │   ├── CodeGraphDb.cs              # Connection factory + migration runner
+│       │   ├── CodeAtlasDb.cs              # Connection factory + migration runner
 │       │   ├── Migrations/                 # Versioned schema migration files
 │       │   │   ├── M001_InitialSchema.cs
 │       │   │   └── M002_Indices.cs
@@ -87,7 +87,7 @@ CodeGraphMcp/
 │       └── CrossStack/
 │           └── ServiceStackLinker.cs       # clevernpm DTO auto-linker
 └── tests/
-    ├── CodeGraphMcp.Tests/
+    ├── CodeAtlas.Tests/
     │   ├── Fixtures/                       # Sample .cs, .ts, .ps1 files
     │   └── IntegrationTests.cs
 ```
@@ -107,7 +107,7 @@ A working CLI binary that can index a codebase into SQLite. No MCP, no git delta
 Priority: High | Status: Planned
 ```
 
-- Create solution: `dotnet new console -n CodeGraphMcp`
+- Create solution: `dotnet new console -n CodeAtlas`
 - Add all NuGet packages above
 - Set up `System.CommandLine` with subcommands: `index <repo-path>`, `query <symbol>`, `serve`
 - Implement `StorageConfig.cs` storage resolution (priority: `--db-dir` > `--store-local` > `%LOCALAPPDATA%`)
@@ -121,7 +121,7 @@ public static class StorageConfig
             return Path.Combine(dbDir, $"{HashRepoPath(repoPath)}.db");
 
         if (storeLocal)
-            return Path.Combine(repoPath, ".agent-index", "code_graph.db");
+            return Path.Combine(repoPath, ".agent-index", "atlas.db");
 
         // Default: %LOCALAPPDATA%\CodeGraph\dbs\<hash>.db
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -133,7 +133,7 @@ public static class StorageConfig
 }
 ```
 
-Configure `CodeGraphMcp.csproj` for AOT from the start:
+Configure `CodeAtlas.csproj` for AOT from the start:
 ```xml
 <PropertyGroup>
   <TargetFramework>net9.0</TargetFramework>
@@ -305,7 +305,7 @@ Priority: High | Status: Planned
 Use `LibGit2Sharp` (avoids shelling out to git):
 
 ```csharp
-public class DeltaEngine(string repoPath, CodeGraphDb db)
+public class DeltaEngine(string repoPath, CodeAtlasDb db)
 {
     public IReadOnlyList<string> GetChangedFiles(string sinceCommit)
     {
@@ -433,7 +433,7 @@ Using the `ModelContextProtocol` .NET SDK:
 var builder = Host.CreateApplicationBuilder();
 
 builder.Services
-    .AddSingleton<CodeGraphDb>()
+    .AddSingleton<CodeAtlasDb>()
     .AddSingleton<DirtyFileBuffer>()
     .AddMcpServer()
     .WithStdioServerTransport()
@@ -450,7 +450,7 @@ Each tool class is decorated with `[McpServerTool]`:
 
 ```csharp
 [McpServerTool, Description("Get the exact code definition of a symbol by name")]
-public class GetSymbolDefinitionTool(CodeGraphDb db, DirtyFileBuffer buffer)
+public class GetSymbolDefinitionTool(CodeAtlasDb db, DirtyFileBuffer buffer)
 {
     [McpServerTool]
     public SymbolResult GetSymbolDefinition(
@@ -468,7 +468,7 @@ public class GetSymbolDefinitionTool(CodeGraphDb db, DirtyFileBuffer buffer)
 
 **Stability gate:**
 ```powershell
-echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | .\CodeGraphMcp.exe serve
+echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | .\CodeAtlas.exe serve
 ```
 Returns all 5 tools in the response.
 
@@ -516,7 +516,7 @@ Implement `GetServiceStackDtoContract` with these auto-linking heuristics during
 - **Angular side:** Components importing from `clevernpm` that consume the TS interface
 
 ```csharp
-public class ServiceStackLinker(CodeGraphDb db)
+public class ServiceStackLinker(CodeAtlasDb db)
 {
     public void LinkDtos()
     {
@@ -583,7 +583,7 @@ Example `mcp.json` registration:
   "servers": {
     "code-graph": {
       "type": "stdio",
-      "command": "C:\\Tools\\CodeGraphMcp\\CodeGraphMcp.exe",
+      "command": "C:\\Tools\\CodeAtlas\\CodeAtlas.exe",
       "args": ["serve", "--repo", "${workspaceFolder}"]
     }
   }
@@ -668,12 +668,12 @@ The 4 test scenarios (from `test-scenarios.md`):
 
 ```powershell
 # Create solution and project
-dotnet new sln -n CodeGraphMcp
-dotnet new console -n CodeGraphMcp -o src/CodeGraphMcp
-dotnet sln add src/CodeGraphMcp/CodeGraphMcp.csproj
+dotnet new sln -n CodeAtlas
+dotnet new console -n CodeAtlas -o src/CodeAtlas
+dotnet sln add src/CodeAtlas/CodeAtlas.csproj
 
 # Add NuGet packages
-cd src/CodeGraphMcp
+cd src/CodeAtlas
 dotnet add package System.CommandLine --prerelease
 dotnet add package Microsoft.Data.Sqlite
 dotnet add package LibGit2Sharp

@@ -1,4 +1,4 @@
-# Phase 3 — MCP Server & 5 Tools
+﻿# Phase 3 — MCP Server & 5 Tools
 ## Implementation Plan — MCP-01 · MCP-02 · MCP-03
 
 **Depends On:** Phase 3 Infrastructure (✅ Complete — 15/15 tests, AOT clean)  
@@ -8,7 +8,7 @@
 
 ## Objective
 
-Wire `CodeGraphMcp.exe serve <repo-path>` into a live **MCP stdio server** exposing 5 tools to AI agents. Uses `ModelContextProtocol` v2.1.0 (already installed).
+Wire `CodeAtlas.exe serve <repo-path>` into a live **MCP stdio server** exposing 5 tools to AI agents. Uses `ModelContextProtocol` v2.1.0 (already installed).
 
 ---
 
@@ -16,7 +16,7 @@ Wire `CodeGraphMcp.exe serve <repo-path>` into a live **MCP stdio server** expos
 
 | Class | Location | Used By |
 | :--- | :--- | :--- |
-| `CodeGraphDb` | `Db/CodeGraphDb.cs` | All tools — `Symbols`, `References`, `IndexState`, `CrossStack` |
+| `CodeAtlasDb` | `Db/CodeAtlasDb.cs` | All tools — `Symbols`, `References`, `IndexState`, `CrossStack` |
 | `DirtyFileBuffer` | `Git/DirtyFileBuffer.cs` | `GetSymbolDefinition`, `SearchCodebaseGraph` — `FindByName(name, lang?)` |
 | `GitHelpers` | `Git/GitHelpers.cs` | `GetDiffImpact` — `GetChangedFiles`, `GetDirtyFiles`, `GetHeadCommitHash`, `GetCurrentBranch` |
 | `ServiceStackLinker` | `CrossStack/ServiceStackLinker.cs` | `GetServiceStackDtoContract` — `LinkDtos()` |
@@ -53,7 +53,7 @@ Creates the `IHost` with `ModelContextProtocol` DI wiring. Scanning tools via `W
 **1. Logging must NOT write to stdout.**  
 The stdio JSON-RPC stream and stdout are the same pipe. Any `Console.WriteLine` or framework log sent to stdout will produce malformed JSON and hang the client. Solution: suppress all logging below `Warning`, and redirect remaining logs to `stderr` only.
 
-**2. `CodeGraphDb` is a singleton with a single `SqliteConnection`.**  
+**2. `CodeAtlasDb` is a singleton with a single `SqliteConnection`.**  
 SQLite in WAL mode supports concurrent readers. All tool queries are reads. `ServiceStackLinker.LinkDtos()` writes — it must only run once, guarded by `lock` or `Lazy<T>`.
 
 **3. `DirtyFileBuffer` must `Refresh()` on startup** so the first tool call has a warm cache, not a cold empty one.
@@ -65,14 +65,14 @@ SQLite in WAL mode supports concurrent readers. All tool queries are reads. `Ser
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using CodeGraphMcp.Config;
-using CodeGraphMcp.CrossStack;
-using CodeGraphMcp.Db;
-using CodeGraphMcp.Git;
-using CodeGraphMcp.Parser;
+using CodeAtlas.Core.Config;
+using CodeAtlas.Core.CrossStack;
+using CodeAtlas.Core.Db;
+using CodeAtlas.Core.Git;
+using CodeAtlas.Parser;
 using ModelContextProtocol.Server;
 
-namespace CodeGraphMcp.Mcp;
+namespace CodeAtlas.Mcp;
 
 /// <summary>Carries repo path into DI without requiring string-keyed services.</summary>
 public sealed record RepoContext(string RepoPath);
@@ -96,21 +96,21 @@ public static class McpServer
         builder.Services
             .AddSingleton<RepoContext>(_ => new RepoContext(repoPath))
             .AddSingleton(_ => parsers)
-            .AddSingleton<CodeGraphDb>(_ =>
+            .AddSingleton<CodeAtlasDb>(_ =>
             {
-                var db = new CodeGraphDb(dbPath);
+                var db = new CodeAtlasDb(dbPath);
                 db.Migrate();
                 return db;
             })
             .AddSingleton(sp =>
             {
-                var db      = sp.GetRequiredService<CodeGraphDb>();
+                var db      = sp.GetRequiredService<CodeAtlasDb>();
                 var ps      = sp.GetRequiredService<IReadOnlyList<ILanguageParser>>();
                 var buf     = new DirtyFileBuffer(repoPath, ps);
                 buf.Refresh();   // warm the cache before first tool call
                 return buf;
             })
-            .AddSingleton(sp => new ServiceStackLinker(sp.GetRequiredService<CodeGraphDb>()))
+            .AddSingleton(sp => new ServiceStackLinker(sp.GetRequiredService<CodeAtlasDb>()))
             .AddMcpServer()
             .WithStdioServerTransport()
             .WithToolsFromAssembly();   // discovers all [McpServerToolType] classes
@@ -378,21 +378,21 @@ If the method is named differently in the existing file, use the actual name.
 ### Stability Gate 1 — `tools/list`
 ```powershell
 echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | `
-    .\publish\CodeGraphMcp.exe serve D:\Projects\C#\repositorydb --store-local
+    .\publish\CodeAtlas.exe serve D:\Projects\C#\repositorydb --store-local
 ```
 Expected: JSON with 5 tools — `get_symbol_definition`, `find_symbol_callers`, `search_codebase_graph`, `get_diff_impact`, `get_servicestack_dto_contract`.
 
 ### Stability Gate 2 — `get_symbol_definition`
 ```powershell
 $req = '{"jsonrpc":"2.0","method":"tools/call","id":2,"params":{"name":"get_symbol_definition","arguments":{"symbolName":"CSharpParser"}}}'
-echo $req | .\publish\CodeGraphMcp.exe serve D:\Projects\C#\repositorydb --store-local
+echo $req | .\publish\CodeAtlas.exe serve D:\Projects\C#\repositorydb --store-local
 ```
 Expected: Response with `FilePath`, `StartLine`, `EndLine`, and `SourceCode` containing the `CSharpParser` class body.
 
 ### Stability Gate 3 — `search_codebase_graph`
 ```powershell
 $req = '{"jsonrpc":"2.0","method":"tools/call","id":3,"params":{"name":"search_codebase_graph","arguments":{"pattern":"Index%"}}}'
-echo $req | .\publish\CodeGraphMcp.exe serve D:\Projects\C#\repositorydb --store-local
+echo $req | .\publish\CodeAtlas.exe serve D:\Projects\C#\repositorydb --store-local
 ```
 Expected: Multiple matches including `IndexOrchestrator`, `IndexResult`, etc.
 
@@ -401,7 +401,7 @@ Run `dotnet test` after implementation — all 15 existing tests must still pass
 
 ### AOT Publish
 ```powershell
-dotnet publish src\CodeGraphMcp -r win-x64 -p:PublishAot=true -p:StripSymbols=true -o publish\
+dotnet publish src\CodeAtlas -r win-x64 -p:PublishAot=true -p:StripSymbols=true -o publish\
 ```
 Expected: No new `IL2xxx` errors introduced by the tool classes (SDK is AOT-compatible).
 

@@ -1,7 +1,7 @@
-using CodeGraphMcp.Models;
+﻿using CodeAtlas.Models;
 using TreeSitter;
 
-namespace CodeGraphMcp.Parser;
+namespace CodeAtlas.Parser;
 
 public abstract class JsTsParserBase
 {

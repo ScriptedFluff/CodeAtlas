@@ -1,10 +1,12 @@
 <Project>
   <Target Name="CopyToDevParsersFolder" AfterTargets="Build">
     <PropertyGroup>
-      <ParserFolderTargetName>$(MSBuildProjectName.Replace('CodeGraphMcp.Parsers.', ''))</ParserFolderTargetName>
-      <TargetParserDirCli>$(SolutionDir)src\CodeGraphMcp.Cli\bin\$(Configuration)\net10.0\Parsers\$(ParserFolderTargetName)\</TargetParserDirCli>
-      <TargetParserDirServer>$(SolutionDir)src\CodeGraphMcp.Server\bin\$(Configuration)\net10.0\Parsers\$(ParserFolderTargetName)\</TargetParserDirServer>
-      <TargetParserDirTests>$(SolutionDir)tests\CodeGraphMcp.Tests\bin\$(Configuration)\net10.0\Parsers\$(ParserFolderTargetName)\</TargetParserDirTests>
+      <EffectiveSolutionDir Condition="'$(SolutionDir)' != '' and '$(SolutionDir)' != '*Undefined*'">$(SolutionDir)</EffectiveSolutionDir>
+      <EffectiveSolutionDir Condition="'$(EffectiveSolutionDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\'))</EffectiveSolutionDir>
+      <ParserFolderTargetName>$(MSBuildProjectName.Replace('CodeAtlas.Parsers.', ''))</ParserFolderTargetName>
+      <TargetParserDirCli>$(EffectiveSolutionDir)src\CodeAtlas.Cli\bin\$(Configuration)\net10.0\Parsers\$(ParserFolderTargetName)\</TargetParserDirCli>
+      <TargetParserDirMcp>$(EffectiveSolutionDir)src\CodeAtlas.Mcp\bin\$(Configuration)\net10.0\Parsers\$(ParserFolderTargetName)\</TargetParserDirMcp>
+      <TargetParserDirTests>$(EffectiveSolutionDir)tests\CodeAtlas.Tests\bin\$(Configuration)\net10.0\Parsers\$(ParserFolderTargetName)\</TargetParserDirTests>
     </PropertyGroup>
     <ItemGroup>
       <ParserOutputFiles Include="$(TargetDir)*.*" />
@@ -13,14 +15,14 @@
     <Copy SourceFiles="@(ParserOutputFiles)"
           DestinationFiles="@(ParserOutputFiles->'$(TargetParserDirCli)%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true"
-          Condition="Exists('$(SolutionDir)src\CodeGraphMcp.Cli')" />
+          Condition="Exists('$(EffectiveSolutionDir)src\CodeAtlas.Cli')" />
     <Copy SourceFiles="@(ParserOutputFiles)"
-          DestinationFiles="@(ParserOutputFiles->'$(TargetParserDirServer)%(RecursiveDir)%(Filename)%(Extension)')"
+          DestinationFiles="@(ParserOutputFiles->'$(TargetParserDirMcp)%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true"
-          Condition="Exists('$(SolutionDir)src\CodeGraphMcp.Server')" />
+          Condition="Exists('$(EffectiveSolutionDir)src\CodeAtlas.Mcp')" />
     <Copy SourceFiles="@(ParserOutputFiles)"
           DestinationFiles="@(ParserOutputFiles->'$(TargetParserDirTests)%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true"
-          Condition="Exists('$(SolutionDir)tests\CodeGraphMcp.Tests')" />
+          Condition="Exists('$(EffectiveSolutionDir)tests\CodeAtlas.Tests')" />
   </Target>
 </Project>

@@ -1,9 +1,9 @@
-# Feature Specification & Implementation Plan: Query Engine Improvements (`Primary Query Glob Transpilation`)
+﻿# Feature Specification & Implementation Plan: Query Engine Improvements (`Primary Query Glob Transpilation`)
 
 **Plan Version:** 1.0 (Model Tag: `g37`)  
 **Status:** Proposed / Ready for Review  
-**Target Projects:** `CodeGraphMcp.Core`, `CodeGraphMcp.Cli`, `CodeGraphMcp.Server`, `CodeGraphMcp.Tests`  
-**Related Specifications:** [`plan/query-filtering.g37.md`](file:///d:/Projects/C%23/CodeGraphMcp/plan/query-filtering.g37.md), [`plan/query-filtering.md`](file:///d:/Projects/C%23/CodeGraphMcp/plan/query-filtering.md)
+**Target Projects:** `CodeAtlas.Core`, `CodeAtlas.Cli`, `CodeAtlas.Mcp`, `CodeAtlas.Tests`  
+**Related Specifications:** [`plan/query-filtering.g37.md`](file:///d:/Projects/C%23/CodeAtlas/plan/query-filtering.g37.md), [`plan/query-filtering.md`](file:///d:/Projects/C%23/CodeAtlas/plan/query-filtering.md)
 
 ---
 
@@ -98,7 +98,7 @@ or standard indexed `LIKE 'Get%' COLLATE NOCASE`.
 
 ```
 src/
-├── CodeGraphMcp.Core/
+├── CodeAtlas.Core/
 │   ├── Filtering/
 │   │   ├── QueryPatternClassifier.cs      [NEW] Fast $O(N)$ string scanner for identifier vs glob detection
 │   │   ├── FilterTranspiler.cs            [MODIFY] Add TranspilePrimaryQuery method with boundary preservation
@@ -108,15 +108,15 @@ src/
 │   │       └── SymbolQueries.cs           [MODIFY] Integrate automatic glob detection into FindByName
 │   └── Git/
 │       └── DirtyFileBuffer.cs             [MODIFY] Apply boundary-aware glob evaluation for dirty uncommitted symbols
-├── CodeGraphMcp.Cli/
+├── CodeAtlas.Cli/
 │   └── Commands/
 │       └── QueryCommandHandler.cs         [MODIFY] Transparently route primary argument through QueryPatternClassifier
-└── CodeGraphMcp.Server/
+└── CodeAtlas.Mcp/
     └── Mcp/
         └── Tools/
             └── SearchCodebaseGraphTool.cs [MODIFY] Enable boundary-respecting globs in primary 'pattern' parameter
 tests/
-└── CodeGraphMcp.Tests/
+└── CodeAtlas.Tests/
     ├── QueryPatternClassifierTests.cs     [NEW] Unit tests for classifier detection and boundary preservation
     ├── PrimaryQueryGlobTests.cs           [NEW] Integration tests for FindByName with globs, prefixes, and suffixes
     └── SearchCodebaseGraphToolTests.cs    [MODIFY] Add test cases for primary glob pattern searching
@@ -126,10 +126,10 @@ tests/
 
 ## 5. Detailed Component Specifications
 
-### 5.1. `QueryPatternClassifier` (`CodeGraphMcp.Core/Filtering/QueryPatternClassifier.cs`)
+### 5.1. `QueryPatternClassifier` (`CodeAtlas.Core/Filtering/QueryPatternClassifier.cs`)
 
 ```csharp
-namespace CodeGraphMcp.Filtering;
+namespace CodeAtlas.Core.Filtering;
 
 public enum QueryPatternKind
 {
@@ -174,7 +174,7 @@ public static class QueryPatternClassifier
 }
 ```
 
-### 5.2. `FilterTranspiler.TranspilePrimaryQuery` (`CodeGraphMcp.Core/Filtering/FilterTranspiler.cs`)
+### 5.2. `FilterTranspiler.TranspilePrimaryQuery` (`CodeAtlas.Core/Filtering/FilterTranspiler.cs`)
 
 Adds a dedicated transpilation path for primary queries that **enforces explicit boundaries**:
 * Unlike `--filter` which may treat unanchored patterns with permissive matching, `TranspilePrimaryQuery` treats:
@@ -186,7 +186,7 @@ Adds a dedicated transpilation path for primary queries that **enforces explicit
 
 ### 5.3. `SymbolQueries.FindByName` & `FindWithFilter` Refactoring
 
-In [`SymbolQueries.cs`](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp.Core/Db/Queries/SymbolQueries.cs):
+In [`SymbolQueries.cs`](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas.Core/Db/Queries/SymbolQueries.cs):
 ```csharp
 public IReadOnlyList<Symbol> FindByName(
     string symbolName,
@@ -248,7 +248,7 @@ public IReadOnlyList<Symbol> FindByName(
 ## 7. Implementation Checklist & Timeline
 
 - [ ] **Phase 1: Query Pattern Classifier & Primary Transpiler**
-  - Implement `QueryPatternClassifier` in `CodeGraphMcp.Core/Filtering/`.
+  - Implement `QueryPatternClassifier` in `CodeAtlas.Core/Filtering/`.
   - Add `TranspilePrimaryQuery` method in `FilterTranspiler.cs`.
   - Add unit tests in `QueryPatternClassifierTests.cs`.
 - [ ] **Phase 2: Database & Dirty Buffer Integration**

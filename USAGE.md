@@ -1,7 +1,7 @@
-# CodeGraphMcp — Usage Guide
+# CodeAtlas — Usage Guide
 
 <!-- Updated 2026-08-10 -->
-`CodeGraphMcp` is a local code knowledge graph and indexer engine designed to parse, index, link reference graphs, cross-stack contracts, and query symbol definitions across multiple programming languages (C#, TypeScript, HTML, PowerShell).
+`CodeAtlas` is a local code knowledge graph and indexer engine designed to parse, index, link reference graphs, cross-stack contracts, and query symbol definitions across multiple programming languages (C#, TypeScript, HTML, PowerShell).
 
 ---
 
@@ -17,21 +17,21 @@ pwsh -File ./scripts/publish.ps1
 ```
 
 The published executables and plugins will be located at:
-- MCP Daemon Server: `.\publish\server\CodeGraphMcp.Server.exe`
-- CLI Utility: `.\publish\cli\CodeGraphMcp.Cli.exe`
+- MCP Daemon Server: `.\publish\server\CodeAtlas.Mcp.exe`
+- CLI Utility: `.\publish\cli\CodeAtlas.Cli.exe`
 - Drop-in Plugins: `.\publish\server\Parsers\` and `.\publish\cli\Parsers\`
 
 ---
 
 ## 2. CLI Commands Overview
 
-`CodeGraphMcp.Cli` (`cg`) supports the following commands:
+`CodeAtlas.Cli` (`atlas` / `codeatlas`) supports the following commands:
 
 ```text
-CodeGraphMcp — local code knowledge graph engine
+CodeAtlas — local code knowledge graph engine
 
 Usage:
-  CodeGraphMcp [command] [options]
+  CodeAtlas [command] [options]
 
 Commands:
   index <repo-path>    Parse and index a repository into the knowledge graph
@@ -54,10 +54,10 @@ The `index` command scans source files, extracts symbols (classes, interfaces, m
 ### Usage
 ```powershell
 # Using dotnet run
-dotnet run --project src/CodeGraphMcp.Cli -- index "C:\path\to\your\repository"
+dotnet run --project src/CodeAtlas.Cli -- index "C:\path\to\your\repository"
 
 # Using published binary
-.\publish\cli\CodeGraphMcp.Cli.exe index "C:\path\to\your\repository"
+.\publish\cli\CodeAtlas.Cli.exe index "C:\path\to\your\repository"
 ```
 
 ### Command Options
@@ -65,12 +65,12 @@ dotnet run --project src/CodeGraphMcp.Cli -- index "C:\path\to\your\repository"
 | Flag | Short | Description |
 | :--- | :--- | :--- |
 | `<repo-path>` | — | **Required.** Path to the repository root directory. |
-| `--db-dir` | — | Override folder location where SQLite database file is created (defaults to `<repo>/.codegraph/`). |
+| `--db-dir` | — | Override folder location where SQLite database file is created (defaults to `<repo>/.codeatlas/`). |
 | `--force-full` | — | Bypass git delta detection and re-parse/re-index every file. |
 | `--no-ignore` | — | Bypass `.gitignore` rules and index all matching source files. |
 
 ### Incremental Delta Indexing & Streaming Pipeline
-- **Git Delta Engine**: If the repository is a **Git repository**, `CodeGraphMcp` records the HEAD commit hash. Subsequent `index` runs inspect `git diff` against the recorded commit and **only re-parse changed or added files**, resulting in sub-100ms updates.
+- **Git Delta Engine**: If the repository is a **Git repository**, `CodeAtlas` records the HEAD commit hash. Subsequent `index` runs inspect `git diff` against the recorded commit and **only re-parse changed or added files**, resulting in sub-100ms updates.
 - **Streaming Producer-Consumer Pipeline**: AST parsers run in parallel across CPU cores, streaming results through an in-memory `Channel` to a dedicated background database writer task that bulk-inserts 250-file symbol batches asynchronously while parsing continues without CPU idle time.
 
 ---
@@ -83,13 +83,13 @@ The `query` command searches for symbol definitions by name across the indexed c
 
 ```powershell
 # Query current directory
-dotnet run --project src/CodeGraphMcp.Cli -- query "IndexOrchestrator"
+dotnet run --project src/CodeAtlas.Cli -- query "IndexOrchestrator"
 
 # Query a specific project directory from anywhere with incoming references/call sites
-dotnet run --project src/CodeGraphMcp.Cli -- query "Individual" --repo "D:\Work\Clever Services\21959" --referenced
+dotnet run --project src/CodeAtlas.Cli -- query "Individual" --repo "D:\Work\Clever Services\21959" --referenced
 
 # Or using the published binary with --with-references alias
-.\publish\cli\CodeGraphMcp.Cli.exe query "MyClass" -r "C:\Projects\MyOtherApp" --with-references
+.\publish\cli\CodeAtlas.Cli.exe query "MyClass" -r "C:\Projects\MyOtherApp" --with-references
 ```
 
 ### Command Options
@@ -110,7 +110,7 @@ dotnet run --project src/CodeGraphMcp.Cli -- query "Individual" --repo "D:\Work\
 
 ### Sample Output
 ```text
-[Class] IndexOrchestrator | src\CodeGraphMcp\Indexer\IndexOrchestrator.cs:9-97
+[Class] IndexOrchestrator | src/CodeAtlas.Core/Indexer/IndexOrchestrator.cs:11-411
 ```
 
 ---
@@ -121,13 +121,13 @@ Displays statistics and current state of the knowledge graph database for a repo
 
 ### Usage
 ```powershell
-dotnet run --project src/CodeGraphMcp.Cli -- status "C:\path\to\your\repository"
+dotnet run --project src/CodeAtlas.Cli -- status "C:\path\to\your\repository"
 ```
 
 ### Sample Output
 ```text
-Repository:       C:\Projects\CodeGraphMcp
-Database:         C:\Projects\CodeGraphMcp\.codegraph\code_graph.db
+Repository:       C:\Projects\CodeAtlas
+Database:         C:\Projects\CodeAtlas\.codeatlas\atlas.db
 Branch:           main
 HEAD:             a1b2c3d4e5f6
 Last Indexed:     a1b2c3d4e5f6
@@ -145,7 +145,7 @@ Monitors the repository for git changes at a scheduled interval and incrementall
 
 ### Usage
 ```powershell
-dotnet run --project src/CodeGraphMcp.Cli -- watch "C:\path\to\your\repository" --interval 30
+dotnet run --project src/CodeAtlas.Cli -- watch "C:\path\to\your\repository" --interval 30
 ```
 
 ### Options
@@ -162,7 +162,7 @@ Deletes the SQLite database file and associated Write-Ahead Log (WAL) files for 
 
 ### Usage
 ```powershell
-dotnet run --project src/CodeGraphMcp.Cli -- clean "C:\path\to\your\repository" --yes
+dotnet run --project src/CodeAtlas.Cli -- clean "C:\path\to\your\repository" --yes
 ```
 
 ### Options
@@ -176,34 +176,34 @@ dotnet run --project src/CodeGraphMcp.Cli -- clean "C:\path\to\your\repository" 
 
 ## 8. Managing Drop-in Parser Plugins (`parsers`)
 
-`CodeGraphMcp` features a decoupled plugin architecture where each language parser is an independent DLL loaded into an isolated, collectible `AssemblyLoadContext`.
+`CodeAtlas` features a decoupled plugin architecture where each language parser is an independent DLL loaded into an isolated, collectible `AssemblyLoadContext`.
 
 ### Subcommands
 
 ```powershell
 # 1. List all installed parsers with status, tier, extensions, and versions
-.\publish\cli\CodeGraphMcp.Cli.exe parsers list
+.\publish\cli\CodeAtlas.Cli.exe parsers list
 
 # Output in JSON format (AOT-safe)
-.\publish\cli\CodeGraphMcp.Cli.exe parsers list --json
+.\publish\cli\CodeAtlas.Cli.exe parsers list --json
 
 # Verbose mode with multi-tier search directories and diagnostics
-.\publish\cli\CodeGraphMcp.Cli.exe parsers list --verbose
+.\publish\cli\CodeAtlas.Cli.exe parsers list --verbose
 
 # 2. Disable a parser (moves folder to DisabledParsers/)
-.\publish\cli\CodeGraphMcp.Cli.exe parsers disable json
+.\publish\cli\CodeAtlas.Cli.exe parsers disable json
 
 # 3. Enable a previously disabled parser (moves folder back to Parsers/)
-.\publish\cli\CodeGraphMcp.Cli.exe parsers enable json
+.\publish\cli\CodeAtlas.Cli.exe parsers enable json
 
 # 4. View detailed metadata for a specific parser
-.\publish\cli\CodeGraphMcp.Cli.exe parsers info csharp
-.\publish\cli\CodeGraphMcp.Cli.exe parsers info csharp --json
+.\publish\cli\CodeAtlas.Cli.exe parsers info csharp
+.\publish\cli\CodeAtlas.Cli.exe parsers info csharp --json
 ```
 
 ### Multi-Tier Directory Layout
-- **Environment Tier**: `CODEGRAPH_PARSERS_DIR` or `CODEGRAPH_PARSERS_PATH`
-- **User Tier**: `%LOCALAPPDATA%\CodeGraphMcp\Parsers` (and `DisabledParsers`)
+- **Environment Tier**: `CODEATLAS_PARSERS_DIR` or `CODEATLAS_PARSERS_PATH`
+- **User Tier**: `%LOCALAPPDATA%\CodeAtlas\Parsers` (and `DisabledParsers`)
 - **Application Tier**: `{AppBaseDirectory}\Parsers` (and `DisabledParsers`)
 
 ### Status Indicators
@@ -217,7 +217,7 @@ dotnet run --project src/CodeGraphMcp.Cli -- clean "C:\path\to\your\repository" 
 
 ## 9. Supported Languages & Files
 
-`CodeGraphMcp` includes 8 modular AST parser plugins out of the box:
+`CodeAtlas` includes 8 modular AST parser plugins out of the box:
 - **C#**: `.cs` (Classes, Interfaces, Structs, Enums, Methods, Properties, Record definitions, Attributes)
 - **TypeScript / JavaScript**: `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs` (Functions, Classes, Interfaces, Enums, Types, Exports)
 - **HTML / XML**: `.html`, `.htm`, `.cshtml`, `.razor`, `.xml`, `.csproj`, `.config`, `.vcxproj`, `.props` (Tags, IDs, Elements, Form Controls)
@@ -236,13 +236,13 @@ Starts the Model Context Protocol (MCP) server over standard input/output (stdio
 
 ```powershell
 # Run MCP daemon server directly
-dotnet run --project src/CodeGraphMcp.Server
+dotnet run --project src/CodeAtlas.Mcp
 
 # Run bound to a specific repository
-dotnet run --project src/CodeGraphMcp.Server -- --repo "C:\path\to\your\repository"
+dotnet run --project src/CodeAtlas.Mcp -- --repo "C:\path\to\your\repository"
 
 # Using published server binary
-.\publish\server\CodeGraphMcp.Server.exe
+.\publish\server\CodeAtlas.Mcp.exe
 ```
 
 ### Command Options
@@ -284,7 +284,7 @@ Searches indexed symbols matching name patterns with optional filters. Automatic
   - `limit`: Optional integer result count cap (default 20, pass higher limit or 0 for expanded/unlimited up to 500 max cap).
 
 #### 4. `get_supported_languages`
-Discovers supported file extensions and active AST parsers on the CodeGraphMcp server instance.
+Discovers supported file extensions and active AST parsers on the CodeAtlas server instance.
 - **Parameters:** None.
 
 #### 5. `get_diff_impact`
@@ -324,8 +324,8 @@ Performs a fast incremental delta sync of all git-modified and dirty files again
 ```json
 {
   "mcpServers": {
-    "codegraph": {
-      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+    "codeatlas": {
+      "command": "D:\\Projects\\C#\\CodeAtlas\\publish\\server\\CodeAtlas.Mcp.exe",
       "args": []
     }
   }
@@ -336,15 +336,15 @@ Performs a fast incremental delta sync of all git-modified and dirty files again
 
 ## 11. Storage & Configuration Details
 
-- **Default Database Path**: `<repo-root>/.codegraph/code_graph.db` (unless `--db-dir` override is specified).
+- **Default Database Path**: `<repo-root>/.codeatlas/atlas.db` (unless `--db-dir` override is specified).
 - **Database Engine**: SQLite (managed via `Microsoft.Data.Sqlite` and `Dapper`).
 
 ### Repository & Custom Ignore / Include Configurations
 
-`CodeGraphMcp` automatically loads ignore and include rules from `.codegraph/settings.json` or `appsettings.json` to customize indexing targets and exclude heavy auto-generated data, test outputs, or lockfiles:
+`CodeAtlas` automatically loads ignore and include rules from `.codeatlas/settings.json` or `appsettings.json` to customize indexing targets and exclude heavy auto-generated data, test outputs, or lockfiles:
 
-1. **Repository Settings Config (`.codegraph/settings.json`)**:
-   Place a `settings.json` in your repository `.codegraph/` directory to declare project-specific include patterns, ignore patterns, or directory exclusions:
+1. **Repository Settings Config (`.codeatlas/settings.json`)**:
+   Place a `settings.json` in your repository `.codeatlas/` directory to declare project-specific include patterns, ignore patterns, or directory exclusions:
    ```json
    {
      "Include": [
@@ -361,17 +361,17 @@ Performs a fast incremental delta sync of all git-modified and dirty files again
    ```
 
 2. **`Include` & `Ignore` Rule Behavior**:
-   - **`Include` Array Rules**: If `"Include"` is missing, empty (`[]`), or contains `"*"` anywhere in the list, `CodeGraphMcp` ignores the include filter and processes all supported codebase files. If specific glob patterns are declared (e.g. `["src/**/*.cs", "*.json"]`), indexing will only parse files matching at least one include pattern.
-   - **`Ignore` Wildcard Warnings**: If `"Ignore"` contains wildcard `"*"` or `"**"`, `CodeGraphMcp` emits an explicit console warning (`Ignore configuration contains wildcard '*' — all files have been filtered out`) to prevent confusion when 0 files are indexed.
+   - **`Include` Array Rules**: If `"Include"` is missing, empty (`[]`), or contains `"*"` anywhere in the list, `CodeAtlas` ignores the include filter and processes all supported codebase files. If specific glob patterns are declared (e.g. `["src/**/*.cs", "*.json"]`), indexing will only parse files matching at least one include pattern.
+   - **`Ignore` Wildcard Warnings**: If `"Ignore"` contains wildcard `"*"` or `"**"`, `CodeAtlas` emits an explicit console warning (`Ignore configuration contains wildcard '*' — all files have been filtered out`) to prevent confusion when 0 files are indexed.
 
 3. **Global Application Config (`appsettings.json`)**:
    Built-in defaults inside `AppConfig` ignore common package lockfiles, output directories, and vendor asset folders like `wwwroot/lib` by default:
    - **Default Ignore Patterns**: `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `*.min.json`, `*.min.js`, `*.min.css`, `*.map`, `**/wwwroot/lib/**`, `**/wwwroot/lib/*`.
-   - **Default Ignore Directories**: `.codegraph`, `node_modules`, `bin`, `obj`, `dist`, `.next`, `coverage`, `.vs`, `packages`, `publish`, `out`, `temp`, `tmp`, `vendor`, `.idea`, `lib`, `wwwroot/lib`.
+   - **Default Ignore Directories**: `.codeatlas`, `node_modules`, `bin`, `obj`, `dist`, `.next`, `coverage`, `.vs`, `packages`, `publish`, `out`, `temp`, `tmp`, `vendor`, `.idea`, `lib`, `wwwroot/lib`.
    - **Language Alias Normalization**: Queries filtering by `--lang` automatically normalize language aliases (e.g. `ps1`/`ps`/`powershell`, `cs`/`c#`/`csharp`, `ts`/`typescript`, `js`/`javascript`, `py`/`python`, `yml`/`yaml`).
 
 4. **Config Loading Hierarchy**:
-   - `.codegraph/settings.json` (Repository .codegraph directory)
+   - `.codeatlas/settings.json` (Repository .codeatlas directory)
    - `appsettings.json` (Repository root or executable output directory)
    - `.gitignore` rules (Git root and subdirectories)
 
@@ -386,7 +386,7 @@ For seamless communication between **AGY (Antigravity)** and **GitHub Copilot** 
 # Run the user-level setup script
 .\scripts\relay\Install-RelayService.ps1
 ```
-This creates a zero-flash startup shortcut at `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\CodeGraphRelay.lnk` and starts the daemon listening at `http://localhost:9123/`.
+This creates a zero-flash startup shortcut at `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\CodeAtlasRelay.lnk` and starts the daemon listening at `http://localhost:9123/`.
 
 ### REST Endpoints
 - **Health Check**: `GET http://localhost:9123/health`

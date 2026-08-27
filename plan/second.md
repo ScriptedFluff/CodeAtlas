@@ -1,4 +1,4 @@
-┌─────────────────────────────────────────────────────────────────────────────┐
+﻿┌─────────────────────────────────────────────────────────────────────────────┐
 │                          DEVELOPER ENVIRONMENT                              │
 │                                                                             │
 │  Git Workspace / IDE (VS Code, Copilot, Antigravity, Terminal)              │
@@ -19,10 +19,10 @@
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            DATA STORAGE TIER                                │
 │                                                                             │
-│  • Primary DB: SQLite Relational Knowledge Graph (code_graph.db)          │
+│  • Primary DB: SQLite Relational Knowledge Graph (atlas.db)          │
 │  • In-Memory Buffer: Live Uncommitted/Staged File Parser                    │
 │  • Storage Modes:                                                           │
 │    - Default: %LOCALAPPDATA%/CodeGraph/dbs/<project_hash>.db             │
-│    - Local (--store-local): <repo>/.agent-index/code_graph.db           │
+│    - Local (--store-local): <repo>/.agent-index/atlas.db           │
 │    - Custom (--db-dir <path>): User-specified directory                   │
 └─────────────────────────────────────────────────────────────────────────────┘

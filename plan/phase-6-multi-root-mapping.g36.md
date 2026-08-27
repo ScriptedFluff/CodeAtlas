@@ -1,8 +1,8 @@
-# Phase 6 Detailed Plan: Multi-Project & Solution Root Mapping
+﻿# Phase 6 Detailed Plan: Multi-Project & Solution Root Mapping
 
 This plan details the implementation of **Multi-Project & Solution Root Mapping** as part of Phase 6 (Multi-Project Solution Support & Unbound MCP Server).
 
-It defines how `CodeGraphMcp` identifies workspace roots, enumerates multi-project solutions (such as C# `.sln`/`.slnx` roots or TypeScript/JavaScript monorepos), normalizes file paths consistently across operating systems, and indexes cross-project symbol relationships.
+It defines how `CodeAtlas` identifies workspace roots, enumerates multi-project solutions (such as C# `.sln`/`.slnx` roots or TypeScript/JavaScript monorepos), normalizes file paths consistently across operating systems, and indexes cross-project symbol relationships.
 
 ---
 
@@ -35,7 +35,7 @@ It defines how `CodeGraphMcp` identifies workspace roots, enumerates multi-proje
 
 ### Component 1: Solution Root Discovery
 
-#### [NEW] [SolutionRootResolver.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Indexer/SolutionRootResolver.cs)
+#### [NEW] [SolutionRootResolver.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Indexer/SolutionRootResolver.cs)
 - Scans upward from a target directory to find the highest-level workspace root containing `.sln`, `.slnx`, `.git`, or `.agent-index`.
 - Exposes `string ResolveRoot(string targetDirectory)` returning the normalized canonical root path.
 
@@ -43,11 +43,11 @@ It defines how `CodeGraphMcp` identifies workspace roots, enumerates multi-proje
 
 ### Component 2: Path Normalization & Multi-Project Indexer Updates
 
-#### [NEW] [WorkspacePathNormalizer.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Indexer/WorkspacePathNormalizer.cs)
+#### [NEW] [WorkspacePathNormalizer.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Indexer/WorkspacePathNormalizer.cs)
 - Standardizes paths to absolute normalized format or relative forward-slash format (`/`).
 - Resolves relative paths relative to `SolutionRootResolver.ResolveRoot(targetDirectory)`.
 
-#### [MODIFY] [IndexOrchestrator.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Indexer/IndexOrchestrator.cs)
+#### [MODIFY] [IndexOrchestrator.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Indexer/IndexOrchestrator.cs)
 - Update `IndexAsync(string targetDirectory)` to resolve the true solution root via `SolutionRootResolver`.
 - Normalize all enumerated file paths to forward-slash relative paths anchored at the solution root.
 - Detect project manifest files (`.csproj`, `tsconfig.json`) to tag file entries with project context.
@@ -56,7 +56,7 @@ It defines how `CodeGraphMcp` identifies workspace roots, enumerates multi-proje
 
 ### Component 3: Database & Reference Resolution Refinements
 
-#### [MODIFY] [ReferenceQueryRepository.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Db/Queries/ReferenceQueryRepository.cs)
+#### [MODIFY] [ReferenceQueryRepository.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Db/Queries/ReferenceQueryRepository.cs)
 - Update reference lookups to query across project boundaries within the solution graph.
 - Support relative path resolution when navigating symbol callers across project subdirectories.
 
@@ -79,4 +79,4 @@ It defines how `CodeGraphMcp` identifies workspace roots, enumerates multi-proje
    - Verify both projects are indexed under `Root` and caller references between `Client` and `Service` resolve correctly.
 
 ### Manual Verification
-- Test `CodeGraphMcp` against a multi-project C# solution directory by invoking tool commands pointing to nested subdirectories, verifying that symbol graphs properly span across solution projects.
+- Test `CodeAtlas` against a multi-project C# solution directory by invoking tool commands pointing to nested subdirectories, verifying that symbol graphs properly span across solution projects.

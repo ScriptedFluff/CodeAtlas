@@ -1,4 +1,4 @@
-# Phase 4 Implementation Plan — REF-01, WATCH-01 & CLI-01
+﻿# Phase 4 Implementation Plan — REF-01, WATCH-01 & CLI-01
 
 **Model Signature:** Gemini 3.6 Flash (g36)  
 **Status:** REF-01 Completed & Committed (`4b939e4`) · WATCH-01 & CLI-01 Ready for Implementation
@@ -18,37 +18,37 @@ Phase 4 completes the knowledge graph engine by:
 
 ### Implemented Changes
 - **Core Models & Interfaces:**
-  - `SymbolReference` record ([SymbolReference.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Models/SymbolReference.cs)).
-  - `ILanguageParser.ParseReferences` default interface method ([ILanguageParser.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Parser/ILanguageParser.cs)).
+  - `SymbolReference` record ([SymbolReference.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Models/SymbolReference.cs)).
+  - `ILanguageParser.ParseReferences` default interface method ([ILanguageParser.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Parser/ILanguageParser.cs)).
 - **AST Parsers:**
-  - `CSharpParser.ParseReferences` for `Call`, `TypeUsage`, `Inheritance` ([CSharpParser.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Parser/CSharpParser.cs)).
-  - `TypeScriptParser.ParseReferences` for `Call`, `TypeUsage`, `Import` ([TypeScriptParser.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Parser/TypeScriptParser.cs)).
+  - `CSharpParser.ParseReferences` for `Call`, `TypeUsage`, `Inheritance` ([CSharpParser.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Parser/CSharpParser.cs)).
+  - `TypeScriptParser.ParseReferences` for `Call`, `TypeUsage`, `Import` ([TypeScriptParser.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Parser/TypeScriptParser.cs)).
 - **Database Layer & Resolution:**
-  - Migration 004 (`idx_refs_file`) in [MigrationRunner.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Db/MigrationRunner.cs).
-  - Scoped symbol resolution (`ResolveId` with `preferredFilePath`) and top-level file fallback (`GetPrimarySymbolIdForFile`) in [SymbolQueries.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Db/Queries/SymbolQueries.cs).
-  - `DeleteByFile` and `UpsertFileReferences` in [ReferenceQueries.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Db/Queries/ReferenceQueries.cs).
+  - Migration 004 (`idx_refs_file`) in [MigrationRunner.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Db/MigrationRunner.cs).
+  - Scoped symbol resolution (`ResolveId` with `preferredFilePath`) and top-level file fallback (`GetPrimarySymbolIdForFile`) in [SymbolQueries.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Db/Queries/SymbolQueries.cs).
+  - `DeleteByFile` and `UpsertFileReferences` in [ReferenceQueries.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Db/Queries/ReferenceQueries.cs).
 - **Indexing Engine:**
-  - 2-pass indexing in [IndexOrchestrator.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Indexer/IndexOrchestrator.cs).
-  - Reference updates and file deletion cleanup in [DeltaEngine.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Git/DeltaEngine.cs).
+  - 2-pass indexing in [IndexOrchestrator.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Indexer/IndexOrchestrator.cs).
+  - Reference updates and file deletion cleanup in [DeltaEngine.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Git/DeltaEngine.cs).
 - **Testing:**
-  - 21 unit tests passing in [ReferenceTests.cs](file:///d:/Projects/C%23/CodeGraphMcp/tests/CodeGraphMcp.Tests/ReferenceTests.cs).
+  - 21 unit tests passing in [ReferenceTests.cs](file:///d:/Projects/C%23/CodeAtlas/tests/CodeAtlas.Tests/ReferenceTests.cs).
 
 ---
 
 ## Remaining Work Unit 1 — WATCH-01 (File Watcher for Live MCP Server)
 
 ### Objective
-Automatically update `DirtyFileBuffer` when files are modified, created, or deleted during an active `CodeGraphMcp serve` session.
+Automatically update `DirtyFileBuffer` when files are modified, created, or deleted during an active `CodeAtlas serve` session.
 
 ### Proposed Changes
 
-#### [NEW] [FileWatcher.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Git/FileWatcher.cs)
+#### [NEW] [FileWatcher.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Git/FileWatcher.cs)
 - Create `FileWatcher` class wrapping `FileSystemWatcher` with a 300ms debounce timer.
 - Handle `Changed`, `Created`, `Deleted`, and `Renamed` events.
 - On file change/creation: call `DirtyFileBuffer.UpdateFile(relPath)`.
 - On file deletion: call `DirtyFileBuffer.Invalidate(relPath)`.
 
-#### [MODIFY] [McpServer.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Mcp/McpServer.cs)
+#### [MODIFY] [McpServer.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Mcp/McpServer.cs)
 - Instantiate and start `FileWatcher` when MCP server starts.
 - Ensure proper disposal when MCP server shuts down.
 
@@ -59,7 +59,7 @@ Automatically update `DirtyFileBuffer` when files are modified, created, or dele
 ### Objective
 Expose CLI utilities to inspect index health, wipe state, and run continuous background delta re-indexing.
 
-### Proposed Subcommands in [Program.cs](file:///d:/Projects/C%23/CodeGraphMcp/src/CodeGraphMcp/Program.cs)
+### Proposed Subcommands in [Program.cs](file:///d:/Projects/C%23/CodeAtlas/src/CodeAtlas/Program.cs)
 
 1. **`status`**
    - Displays database location, commit hash, indexed branch, total file count, symbol count, and reference count.
@@ -80,8 +80,8 @@ Expose CLI utilities to inspect index health, wipe state, and run continuous bac
 
 ### CLI & Manual Verification
 ```powershell
-dotnet build src/CodeGraphMcp
+dotnet build src/CodeAtlas
 dotnet test
-./publish/CodeGraphMcp.exe status D:\Projects\C#\CodeGraphMcp --store-local
-./publish/CodeGraphMcp.exe clean D:\Projects\C#\CodeGraphMcp --store-local --yes
+./publish/CodeAtlas.exe status D:\Projects\C#\CodeAtlas --store-local
+./publish/CodeAtlas.exe clean D:\Projects\C#\CodeAtlas --store-local --yes
 ```

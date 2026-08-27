@@ -48,3 +48,6 @@ Desktop.ini
 # CodeGraphMcp local index & settings
 .codegraph/
 outputs
+
+# CodeAtlas local index & settings
+.codeatlas/

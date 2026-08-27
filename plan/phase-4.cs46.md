@@ -1,4 +1,4 @@
-# Phase 4 — Reference Graph, File Watcher & CLI Utilities
+﻿# Phase 4 — Reference Graph, File Watcher & CLI Utilities
 ## Implementation Plan — REF-01 · WATCH-01 · CLI-01
 
 **Depends On:** Phase 3 (✅ Complete — MCP server + 5 tools, 15/15 tests, AOT clean)  
@@ -71,7 +71,7 @@ Walk the tree-sitter AST a second time (same parse, same tree) to extract **invo
 ### New Model: `Models/SymbolReference.cs`
 
 ```csharp
-namespace CodeGraphMcp.Models;
+namespace CodeAtlas.Models;
 
 /// <summary>
 /// A single reference edge: "caller at line N references target by name".
@@ -392,7 +392,7 @@ Automatically update `DirtyFileBuffer` when files change on disk during a live M
 ### New File: `Git/FileWatcher.cs`
 
 ```csharp
-namespace CodeGraphMcp.Git;
+namespace CodeAtlas.Core.Git;
 
 /// <summary>
 /// Watches the repository directory for file changes and updates
@@ -556,7 +556,7 @@ statusCommand.AddOption(storeLocalOption);
 statusCommand.SetHandler((repo, dbDir, storeLocal) =>
 {
     var dbPath = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, repo.FullName);
-    using var db = new CodeGraphDb(dbPath);
+    using var db = new CodeAtlasDb(dbPath);
     db.Migrate();
 
     var lastHash = db.IndexState.GetLastCommitHash();
@@ -630,7 +630,7 @@ watchCommand.AddOption(intervalOption);
 watchCommand.SetHandler(async (repo, dbDir, storeLocal, interval) =>
 {
     var dbPath  = StorageConfig.ResolveDbPath(dbDir?.FullName, storeLocal, repo.FullName);
-    using var db = new CodeGraphDb(dbPath);
+    using var db = new CodeAtlasDb(dbPath);
     db.Migrate();
     var parsers = GetParsers();
     var delta   = new DeltaEngine(repo.FullName, db, parsers);
@@ -707,14 +707,14 @@ rootCommand.AddCommand(watchCommand);
 
 ### Stability Gate 1 — Build + Tests
 ```powershell
-dotnet build src\CodeGraphMcp
+dotnet build src\CodeAtlas
 dotnet test
 ```
 
 ### Stability Gate 2 — Reference Population
 ```powershell
-.\publish\CodeGraphMcp.exe index D:\Projects\C#\CodeGraphMcp --store-local --force-full
-sqlite3 .agent-index\code_graph.db "SELECT COUNT(*) FROM symbol_references;"
+.\publish\CodeAtlas.exe index D:\Projects\C#\CodeAtlas --store-local --force-full
+sqlite3 .agent-index\atlas.db "SELECT COUNT(*) FROM symbol_references;"
 ```
 Expected: > 0 rows (likely 200+ for this repo).
 
@@ -722,19 +722,19 @@ Expected: > 0 rows (likely 200+ for this repo).
 Use the MCP stdio smoke test to call `find_symbol_callers` with `symbolName: "FindByName"`. Expected: multiple callers across tool files.
 
 ### Stability Gate 4 — File Watcher
-1. Start MCP server: `.\publish\CodeGraphMcp.exe serve D:\Projects\C#\CodeGraphMcp --store-local`
+1. Start MCP server: `.\publish\CodeAtlas.exe serve D:\Projects\C#\CodeAtlas --store-local`
 2. In another terminal, modify a `.cs` file and save.
 3. Call `search_codebase_graph` — verify `isLive: true` result reflects the edit without restarting the server.
 
 ### Stability Gate 5 — CLI Utilities
 ```powershell
-.\publish\CodeGraphMcp.exe status D:\Projects\C#\CodeGraphMcp --store-local
-.\publish\CodeGraphMcp.exe clean D:\Projects\C#\CodeGraphMcp --store-local --yes
-.\publish\CodeGraphMcp.exe status D:\Projects\C#\CodeGraphMcp --store-local   # should show 0 symbols
+.\publish\CodeAtlas.exe status D:\Projects\C#\CodeAtlas --store-local
+.\publish\CodeAtlas.exe clean D:\Projects\C#\CodeAtlas --store-local --yes
+.\publish\CodeAtlas.exe status D:\Projects\C#\CodeAtlas --store-local   # should show 0 symbols
 ```
 
 ### AOT Publish
 ```powershell
-dotnet publish src\CodeGraphMcp -r win-x64 -p:PublishAot=true -p:StripSymbols=true -o publish\
+dotnet publish src\CodeAtlas -r win-x64 -p:PublishAot=true -p:StripSymbols=true -o publish\
 ```
 Expected: No new `IL2xxx`/`IL3xxx` warnings.

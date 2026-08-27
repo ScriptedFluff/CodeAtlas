@@ -1,8 +1,8 @@
-# Feature Specification & Plan: Glob-Based Batch Re-Indexing & Ignore Purge
+﻿# Feature Specification & Plan: Glob-Based Batch Re-Indexing & Ignore Purge
 
 **Plan Version:** 1.0 (Model Tag: `g37`)  
 **Status:** Proposed / Ready for Review  
-**Target Projects:** `CodeGraphMcp.Core`, `CodeGraphMcp.Cli`, `CodeGraphMcp.Server`, `CodeGraphMcp.Tests`
+**Target Projects:** `CodeAtlas.Core`, `CodeAtlas.Cli`, `CodeAtlas.Mcp`, `CodeAtlas.Tests`
 
 ---
 
@@ -34,7 +34,7 @@ Extend the existing single-file indexing capability (`SingleFileIndexer` / `code
 
 * **Syntax**: `codegraph ignore add <pattern> [--repo|-r <path>] [--purge|-p]`
 * **Behavior**:
-  1. Writes the normalized pattern to `.codegraph/settings.json` via `ProjectConfigManager.AddIgnorePattern`.
+  1. Writes the normalized pattern to `.codeatlas/settings.json` via `ProjectConfigManager.AddIgnorePattern`.
   2. If `--purge` is set and an index database exists:
      - Identifies all `file_path`s in `symbols` matching the pattern.
      - Cascade deletes all matching symbols, references, and cross-stack mappings in a single transaction.
@@ -67,10 +67,10 @@ flowchart TD
 
 ## 4. Core Components & Implementation Details
 
-### 4.1. `GlobFileIndexer` (`src/CodeGraphMcp.Core/Indexer/GlobFileIndexer.cs`)
+### 4.1. `GlobFileIndexer` (`src/CodeAtlas.Core/Indexer/GlobFileIndexer.cs`)
 
 ```csharp
-namespace CodeGraphMcp.Indexer;
+namespace CodeAtlas.Core.Indexer;
 
 public sealed record GlobSyncResult(
     string Pattern,
@@ -88,7 +88,7 @@ public interface IGlobFileIndexer
 {
     Task<GlobSyncResult> SyncGlobAsync(
         string workspaceRoot,
-        CodeGraphDb db,
+        CodeAtlasDb db,
         string pathOrGlob,
         bool isDelete = false,
         bool noIgnore = false,
@@ -97,7 +97,7 @@ public interface IGlobFileIndexer
 
     Task<GlobSyncResult> PurgeGlobAsync(
         string workspaceRoot,
-        CodeGraphDb db,
+        CodeAtlasDb db,
         string globPattern,
         CancellationToken ct = default);
 }
@@ -118,7 +118,7 @@ public interface IGlobFileIndexer
    - Parses ASTs across thread pool (`Parallel.ForEach` / `Task.WhenAll`).
    - Batches symbol and reference insertions inside unified SQLite transactions (e.g. 100 files per transaction).
 
-### 4.2. MCP Tool Integration (`src/CodeGraphMcp.Server/Mcp/Tools/SyncFileTool.cs`)
+### 4.2. MCP Tool Integration (`src/CodeAtlas.Mcp/Mcp/Tools/SyncFileTool.cs`)
 
 Enhance `SyncFileTool.SyncFileAsync` to seamlessly handle both single files and glob patterns, or introduce `SyncGlobTool`:
 * If `filePath` contains wildcards (`*`, `?`), delegate directly to `IGlobFileIndexer`.
@@ -153,14 +153,14 @@ Enhance `SyncFileTool.SyncFileAsync` to seamlessly handle both single files and 
 3. **`IgnoreAdd_WithPurgeFlag_UpdatesSettingsAndPurgesDb`**:
    - Pre-populates DB with fixture symbols.
    - CLI invocation: `codegraph ignore add "tests/fixtures/**" -r <tempDir> --purge`.
-   - Asserts `.codegraph/settings.json` is updated and DB records for `tests/fixtures/**` are purged.
+   - Asserts `.codeatlas/settings.json` is updated and DB records for `tests/fixtures/**` are purged.
 
 ---
 
 ## 6. Implementation Checklist
 
 - [x] **Phase 1: Core Glob Indexing Service**
-  - Implement `GlobFileIndexer` in `CodeGraphMcp.Core/Indexer/GlobFileIndexer.cs`.
+  - Implement `GlobFileIndexer` in `CodeAtlas.Core/Indexer/GlobFileIndexer.cs`.
   - Register in DI / Core factories.
   - Add unit tests in `GlobFileIndexerTests.cs`.
 - [x] **Phase 2: CLI Wiring & Ignore Purge Integration**

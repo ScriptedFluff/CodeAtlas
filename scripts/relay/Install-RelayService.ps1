@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Install User-Level CodeGraph Relay Service
+    Install User-Level CodeAtlas Relay Service
 .DESCRIPTION
     Registers a Windows Task Scheduler task or Startup folder VBScript shortcut (RunHidden.vbs)
     running under non-admin user privileges to automatically start the Relay Daemon at user logon.
@@ -20,7 +20,7 @@ if (-not (Test-Path $DaemonScript)) {
     exit 1
 }
 
-$TaskName = "CodeGraphRelayDaemon"
+$TaskName = "CodeAtlasRelayDaemon"
 $Trigger = New-ScheduledTaskTrigger -AtLogOn
 $Action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument "`"$VbsScript`""
 $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit 0
@@ -35,7 +35,7 @@ catch {
     Write-Host "Scheduled task registration encountered an issue: $_. Falling back to Startup folder VBScript shortcut..." -ForegroundColor Yellow
 
     $StartupFolder = [System.IO.Path]::Combine($env:APPDATA, "Microsoft\Windows\Start Menu\Programs\Startup")
-    $ShortcutPath = Join-Path $StartupFolder "CodeGraphRelay.lnk"
+    $ShortcutPath = Join-Path $StartupFolder "CodeAtlasRelay.lnk"
     
     $WshShell = New-Object -ComObject WScript.Shell
     $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
@@ -59,5 +59,5 @@ try {
     Write-Host "Relay Daemon operational! Response: $($health | ConvertTo-Json -Compress)" -ForegroundColor Green
 }
 catch {
-    Write-Host "Warning: Could not connect to http://localhost:$Port/health yet. Check log at %LOCALAPPDATA%\CodeGraphRelay\relay.log" -ForegroundColor Yellow
+    Write-Host "Warning: Could not connect to http://localhost:$Port/health yet. Check log at %LOCALAPPDATA%\CodeAtlasRelay\relay.log" -ForegroundColor Yellow
 }

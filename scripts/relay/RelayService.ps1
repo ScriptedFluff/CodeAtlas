@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    CodeGraph Relay Daemon Service
+    CodeAtlas Relay Daemon Service
 .DESCRIPTION
     Lightweight PowerShell background daemon that provides local HTTP endpoint (localhost:9123)
     for inter-process messaging between AGY and Copilot without cross-directory access prompts.
@@ -11,7 +11,7 @@ param (
 )
 
 $ErrorActionPreference = "Stop"
-$LogPath = "$env:LOCALAPPDATA\CodeGraphRelay\relay.log"
+$LogPath = "$env:LOCALAPPDATA\CodeAtlasRelay\relay.log"
 $LogDir = [System.IO.Path]::GetDirectoryName($LogPath)
 if (-not (Test-Path -Path $LogDir)) {
     New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
@@ -23,7 +23,7 @@ function Write-Log {
     "[$timestamp] $Message" | Out-File -FilePath $LogPath -Append -Encoding utf8
 }
 
-Write-Log "Starting CodeGraph Relay Daemon on port $Port..."
+Write-Log "Starting CodeAtlas Relay Daemon on port $Port..."
 
 # Recipient-targeted queue dictionary
 $queues = @{
@@ -47,7 +47,7 @@ catch {
 
 # Register graceful exit on PowerShell process exit
 $null = [System.AppDomain]::CurrentDomain.add_ProcessExit({
-    Write-Log "Stopping CodeGraph Relay Daemon..."
+    Write-Log "Stopping CodeAtlas Relay Daemon..."
     $listener.Stop()
     $listener.Close()
 })

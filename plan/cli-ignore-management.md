@@ -1,10 +1,10 @@
-# Feature Specification: CLI Ignore Management (`codegraph ignore`)
+﻿# Feature Specification: CLI Ignore Management (`codegraph ignore`)
 
 ## 1. Overview & Objective
 
-Provide a dedicated CLI command suite (`codegraph ignore`) that allows developers and AI coding agents to inspect, add, and remove project-level file and directory ignore rules without manually editing `.codegraph/settings.json`.
+Provide a dedicated CLI command suite (`codegraph ignore`) that allows developers and AI coding agents to inspect, add, and remove project-level file and directory ignore rules without manually editing `.codeatlas/settings.json`.
 
-This feature resides exclusively in the CLI project (`CodeGraphMcp`) while reading and updating the shared configuration format used by the core indexing and file watching engines.
+This feature resides exclusively in the CLI project (`CodeAtlas`) while reading and updating the shared configuration format used by the core indexing and file watching engines.
 
 ---
 
@@ -41,14 +41,14 @@ Removes an existing pattern from the configuration.
 ```bash
 codegraph ignore remove "*.generated.cs"
 # Output:
-# Removed pattern '*.generated.cs' from .codegraph/settings.json
+# Removed pattern '*.generated.cs' from .codeatlas/settings.json
 ```
 
 ---
 
 ## 3. Configuration Storage Format
 
-The CLI commands read from and write to `.codegraph/settings.json` at the project root.
+The CLI commands read from and write to `.codeatlas/settings.json` at the project root.
 
 ```json
 {
@@ -63,7 +63,7 @@ The CLI commands read from and write to `.codegraph/settings.json` at the projec
 ```
 
 ### File & Directory Lifecycle
-1. If the `.codegraph/` directory does not exist, it is automatically created.
+1. If the `.codeatlas/` directory does not exist, it is automatically created.
 2. If `settings.json` does not exist, a default structure containing the `ignorePatterns` array is created.
 3. If `settings.json` exists, non-ignore configuration keys (e.g., custom parsers, DB paths) are strictly preserved during formatting and writing.
 
@@ -96,9 +96,9 @@ flowchart TD
 
 | Component | Target File | Description |
 |---|---|---|
-| **CLI Command Handler** | `src/CodeGraphMcp/Commands/IgnoreCommand.cs` | Parses CLI subcommands (`add`, `remove`, `list`) and arguments. |
-| **Config Service** | `src/CodeGraphMcp.Core/Config/ProjectConfigManager.cs` | Reads, validates, mutates, and serializes `.codegraph/settings.json`. |
-| **Program Entry Point** | `src/CodeGraphMcp/Program.cs` | Registers the `ignore` command group in the CLI runner. |
+| **CLI Command Handler** | `src/CodeAtlas/Commands/IgnoreCommand.cs` | Parses CLI subcommands (`add`, `remove`, `list`) and arguments. |
+| **Config Service** | `src/CodeAtlas.Core/Config/ProjectConfigManager.cs` | Reads, validates, mutates, and serializes `.codeatlas/settings.json`. |
+| **Program Entry Point** | `src/CodeAtlas/Program.cs` | Registers the `ignore` command group in the CLI runner. |
 
 ---
 

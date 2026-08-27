@@ -1,9 +1,9 @@
-# Feature Implementation Plan: Query Filtering Engine (`--filter`)
+﻿# Feature Implementation Plan: Query Filtering Engine (`--filter`)
 
 **Plan Version:** 1.0 (Model Tag: `g37`)  
 **Status:** Proposed / Ready for Review  
-**Target Projects:** `CodeGraphMcp.Core`, `CodeGraphMcp.Cli`, `CodeGraphMcp.Server`, `CodeGraphMcp.Tests`  
-**Related Specifications:** [`plan/query-filtering.md`](file:///d:/Projects/C%23/CodeGraphMcp/plan/query-filtering.md)
+**Target Projects:** `CodeAtlas.Core`, `CodeAtlas.Cli`, `CodeAtlas.Mcp`, `CodeAtlas.Tests`  
+**Related Specifications:** [`plan/query-filtering.md`](file:///d:/Projects/C%23/CodeAtlas/plan/query-filtering.md)
 
 ---
 
@@ -167,7 +167,7 @@ public async IAsyncEnumerable<Symbol> StreamFilteredSymbolsAsync(
 #### CLI JSON Response Model (`QueryFilterResponse`):
 ```json
 {
-  "repoPath": "D:/Projects/C#/CodeGraphMcp",
+  "repoPath": "D:/Projects/C#/CodeAtlas",
   "filter": "((.equest)|(Response))",
   "transpiledToSql": true,
   "totalReturned": 500,
@@ -195,7 +195,7 @@ public async IAsyncEnumerable<Symbol> StreamFilteredSymbolsAsync(
 
 ```
 src/
-├── CodeGraphMcp.Core/
+├── CodeAtlas.Core/
 │   ├── Query/
 │   │   ├── FilterTranspiler.cs           [NEW] AST tokenizer, optimizer & SQLite WHERE generator
 │   │   ├── FilterAst.cs                  [NEW] AST node records (Literal, Wildcard, Group, Alternation)
@@ -206,17 +206,17 @@ src/
 │   │       └── SymbolQueries.cs          [MODIFY] Add FindWithFilter & FetchBatchForCursor queries
 │   └── Git/
 │       └── DirtyFileBuffer.cs            [MODIFY] Add pattern/transpiler filtering support
-├── CodeGraphMcp.Cli/
+├── CodeAtlas.Cli/
 │   └── Commands/
 │       ├── QueryCommandHandler.cs        [NEW] Dedicated CLI query handler with cursor/json options
 │       ├── CommandFactory.cs             [MODIFY] Wire enhanced QueryCommandHandler into RootCommand
 │       └── CliJsonContext.cs             [MODIFY] Register QueryFilterResponse in JSON serializer context
-└── CodeGraphMcp.Server/
+└── CodeAtlas.Mcp/
     └── Mcp/
         └── Tools/
             └── SearchCodebaseGraphTool.cs [MODIFY] Integrate FilterTranspiler & Keyset Cursor for pushdown
 tests/
-└── CodeGraphMcp.Tests/
+└── CodeAtlas.Tests/
     ├── FilterTranspilerTests.cs          [NEW] Unit tests for pattern transpilation & AST generation
     ├── SymbolQueriesFilterTests.cs       [NEW] Integration tests for keyset cursor & batch streaming
     ├── QueryCommandHandlerTests.cs       [NEW] CLI E2E tests for --filter, --cursor, and --json
@@ -227,10 +227,10 @@ tests/
 
 ## 6. Detailed Component Implementation Details
 
-### 6.1. `FilterTranspiler` (`CodeGraphMcp.Core/Query/FilterTranspiler.cs`)
+### 6.1. `FilterTranspiler` (`CodeAtlas.Core/Query/FilterTranspiler.cs`)
 
 ```csharp
-namespace CodeGraphMcp.Query;
+namespace CodeAtlas.Core.Query;
 
 public sealed record FilterTranspileResult(
     bool IsTranslatable,
@@ -347,14 +347,14 @@ public SymbolFilterResult FindWithFilter(
 ## 8. Implementation Checklist & Phased Rollout
 
 - [ ] **Phase 1: Transpiler & Grammar Engine**
-  - Implement `FilterAst.cs`, `FilterAstParser.cs`, and `FilterTranspiler.cs` in `CodeGraphMcp.Core/Query/`.
+  - Implement `FilterAst.cs`, `FilterAstParser.cs`, and `FilterTranspiler.cs` in `CodeAtlas.Core/Query/`.
   - Add comprehensive unit tests in `FilterTranspilerTests.cs`.
 - [ ] **Phase 2: Database Keyset & Streaming Fallback**
   - Implement `FindWithFilter` and chunked cursor methods in `SymbolQueries.cs`.
   - Update `DirtyFileBuffer.cs` to filter dirty symbols with `FilterTranspileResult`.
   - Add integration tests in `SymbolQueriesFilterTests.cs` and `DirtyBufferFilterTests.cs`.
 - [ ] **Phase 3: CLI Command Handler & Wiring**
-  - Implement `QueryCommandHandler.cs` in `CodeGraphMcp.Cli/Commands/`.
+  - Implement `QueryCommandHandler.cs` in `CodeAtlas.Cli/Commands/`.
   - Wire options into `CommandFactory.cs`.
   - Register DTOs in `CliJsonContext.cs`.
   - Add CLI E2E tests in `QueryCommandHandlerTests.cs`.

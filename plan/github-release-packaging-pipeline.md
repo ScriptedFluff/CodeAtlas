@@ -1,13 +1,13 @@
-# Feature Specification: GitHub Release & Packaging Pipeline
+﻿# Feature Specification: GitHub Release & Packaging Pipeline
 
 ## 1. Overview & Objective
 
-Automate the build, packaging, and distribution of CodeGraphMcp via GitHub Actions.
+Automate the build, packaging, and distribution of CodeAtlas via GitHub Actions.
 
 The pipeline delivers three distribution artifacts per release:
 1. **Windows Installer (`.msi`)**: Standard enterprise installer with PATH registration and Start Menu shortcuts.
 2. **Portable Archives (`.zip` / `.tar.gz`)**: Standalone self-contained binaries for restricted environments where admin installation or MSI execution is prohibited.
-3. **NuGet Package (`CodeGraphMcp.Abstractions.nupkg`)**: Standalone parser contracts published to NuGet.org / GitHub Packages.
+3. **NuGet Package (`CodeAtlas.Abstractions.nupkg`)**: Standalone parser contracts published to NuGet.org / GitHub Packages.
 
 ---
 
@@ -15,11 +15,11 @@ The pipeline delivers three distribution artifacts per release:
 
 | Artifact | Format | Target Users / Scenarios | Publishing Target |
 |---|---|---|---|
-| **Windows Installer** | `CodeGraphMcp-vX.Y.Z-win-x64.msi` | Standard developer machines; automatic PATH setup | GitHub Release |
-| **Portable Windows** | `CodeGraphMcp-vX.Y.Z-win-x64.zip` | Enterprise/restricted environments (no admin rights) | GitHub Release |
-| **Portable Linux** | `CodeGraphMcp-vX.Y.Z-linux-x64.tar.gz` | Linux dev environments & CI containers | GitHub Release |
-| **Portable macOS** | `CodeGraphMcp-vX.Y.Z-osx-arm64.tar.gz` | Apple Silicon / macOS developers | GitHub Release |
-| **Plugin Contracts** | `CodeGraphMcp.Abstractions.X.Y.Z.nupkg` | Community & 3rd-party parser developers | NuGet.org |
+| **Windows Installer** | `CodeAtlas-vX.Y.Z-win-x64.msi` | Standard developer machines; automatic PATH setup | GitHub Release |
+| **Portable Windows** | `CodeAtlas-vX.Y.Z-win-x64.zip` | Enterprise/restricted environments (no admin rights) | GitHub Release |
+| **Portable Linux** | `CodeAtlas-vX.Y.Z-linux-x64.tar.gz` | Linux dev environments & CI containers | GitHub Release |
+| **Portable macOS** | `CodeAtlas-vX.Y.Z-osx-arm64.tar.gz` | Apple Silicon / macOS developers | GitHub Release |
+| **Plugin Contracts** | `CodeAtlas.Abstractions.X.Y.Z.nupkg` | Community & 3rd-party parser developers | NuGet.org |
 
 ---
 
@@ -56,9 +56,9 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       - name: Restore Dependencies
-        run: dotnet restore CodeGraphMcp.slnx
+        run: dotnet restore CodeAtlas.slnx
       - name: Run Tests
-        run: dotnet test CodeGraphMcp.slnx -c Release --no-restore --verbosity normal
+        run: dotnet test CodeAtlas.slnx -c Release --no-restore --verbosity normal
 
   # -------------------------------------------------------------
   # Job 2: Build & Publish NuGet Abstractions
@@ -75,7 +75,7 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       - name: Pack Abstractions
         run: |
-          dotnet pack src/CodeGraphMcp.Abstractions/CodeGraphMcp.Abstractions.csproj \
+          dotnet pack src/CodeAtlas.Abstractions/CodeAtlas.Abstractions.csproj \
             -c Release \
             -o ./nuget-dist \
             -p:PackageVersion=${{ github.ref_name || inputs.version }}
@@ -114,7 +114,7 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       - name: Publish Self-Contained Binary
         run: |
-          dotnet publish src/CodeGraphMcp/CodeGraphMcp.csproj \
+          dotnet publish src/CodeAtlas/CodeAtlas.csproj \
             -c Release \
             -r ${{ matrix.target }} \
             --self-contained true \
@@ -124,16 +124,16 @@ jobs:
       - name: Create Archive (Windows)
         if: runner.os == 'Windows'
         run: |
-          Compress-Archive -Path ./publish/${{ matrix.target }}/* -DestinationPath ./CodeGraphMcp-${{ matrix.target }}.zip
+          Compress-Archive -Path ./publish/${{ matrix.target }}/* -DestinationPath ./CodeAtlas-${{ matrix.target }}.zip
       - name: Create Archive (Unix)
         if: runner.os != 'Windows'
         run: |
-          tar -czvf ./CodeGraphMcp-${{ matrix.target }}.tar.gz -C ./publish/${{ matrix.target }} .
+          tar -czvf ./CodeAtlas-${{ matrix.target }}.tar.gz -C ./publish/${{ matrix.target }} .
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: portable-${{ matrix.target }}
-          path: CodeGraphMcp-${{ matrix.target }}.*
+          path: CodeAtlas-${{ matrix.target }}.*
 
   # -------------------------------------------------------------
   # Job 4: Build Windows MSI Installer
@@ -152,21 +152,21 @@ jobs:
         run: dotnet tool install --global wix
       - name: Publish Staging Files
         run: |
-          dotnet publish src/CodeGraphMcp/CodeGraphMcp.csproj \
+          dotnet publish src/CodeAtlas/CodeAtlas.csproj \
             -c Release \
             -r win-x64 \
             --self-contained true \
             -o ./msi-staging
       - name: Build MSI with WiX
         run: |
-          wix build installer/CodeGraphMcp.wxs \
+          wix build installer/CodeAtlas.wxs \
             -d SourceDir=./msi-staging \
-            -o ./CodeGraphMcp-win-x64.msi
+            -o ./CodeAtlas-win-x64.msi
       - name: Upload MSI Artifact
         uses: actions/upload-artifact@v4
         with:
           name: msi-installer
-          path: ./CodeGraphMcp-win-x64.msi
+          path: ./CodeAtlas-win-x64.msi
 
   # -------------------------------------------------------------
   # Job 5: Create GitHub Release

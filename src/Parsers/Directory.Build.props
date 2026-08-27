@@ -9,6 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\CodeGraphMcp.Abstractions\CodeGraphMcp.Abstractions.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\..\CodeAtlas.Abstractions\CodeAtlas.Abstractions.csproj" Private="false" ExcludeAssets="runtime" />
   </ItemGroup>
 </Project>

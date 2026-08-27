@@ -1,12 +1,12 @@
-# CodeGraphMcp — MCP Configuration Guide
+# CodeAtlas — MCP Configuration Guide
 
-This guide details how to configure and integrate `CodeGraphMcp` as a Model Context Protocol (MCP) server across various AI assistants, IDEs, and client applications.
+This guide details how to configure and integrate `CodeAtlas` as a Model Context Protocol (MCP) server across various AI assistants, IDEs, and client applications.
 
 ---
 
 ## 1. Prerequisites & Setup
 
-Before configuring your AI client, publish the release binaries and modular parser plugins for `CodeGraphMcp`:
+Before configuring your AI client, publish the release binaries and modular parser plugins for `CodeAtlas`:
 
 ```powershell
 # Publish Server daemon, CLI utility, and all 8 drop-in parser plugins
@@ -14,28 +14,28 @@ pwsh -File ./scripts/publish.ps1
 ```
 
 The compiled executables and plugins will be located at:
-- Server Daemon: `D:\Projects\C#\CodeGraphMcp\publish\server\CodeGraphMcp.Server.exe`
-- CLI Utility: `D:\Projects\C#\CodeGraphMcp\publish\cli\CodeGraphMcp.Cli.exe`
-- Drop-in Plugins: `D:\Projects\C#\CodeGraphMcp\publish\server\Parsers\`
+- Server Daemon: `D:\Projects\C#\CodeAtlas\publish\server\CodeAtlas.Mcp.exe`
+- CLI Utility: `D:\Projects\C#\CodeAtlas\publish\cli\CodeAtlas.Cli.exe`
+- Drop-in Plugins: `D:\Projects\C#\CodeAtlas\publish\server\Parsers\`
 
 ---
 
 ## 2. Server Execution Modes
 
-`CodeGraphMcp.Server` runs as a high-performance MCP stdio server with full dynamic drop-in parser support:
+`CodeAtlas.Mcp` runs as a high-performance MCP stdio server with full dynamic drop-in parser support:
 
 ### Mode A: Dynamic / Unbound Mode (Recommended)
 In this mode, no target repository is hardcoded at server launch. The server will resolve repository paths dynamically when tools are invoked, using either an explicit `targetDirectory` argument or defaulting to the client's current active workspace directory.
 
 ```powershell
-.\publish\server\CodeGraphMcp.Server.exe
+.\publish\server\CodeAtlas.Mcp.exe
 ```
 
 ### Mode B: Bound Repository Mode
 In this mode, the server is locked to a specific repository path. Every tool query automatically targets this index unless explicitly overridden.
 
 ```powershell
-.\publish\server\CodeGraphMcp.Server.exe -r "C:\Projects\MyRepo"
+.\publish\server\CodeAtlas.Mcp.exe -r "C:\Projects\MyRepo"
 ```
 
 ---
@@ -49,8 +49,8 @@ Add the following entry to your `mcp_config.json`:
 ```json
 {
   "mcpServers": {
-    "codegraph": {
-      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+    "codeatlas": {
+      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeAtlas.Mcp.exe",
       "args": []
     }
   }
@@ -62,8 +62,8 @@ If targeting a fixed repository:
 ```json
 {
   "mcpServers": {
-    "codegraph": {
-      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+    "codeatlas": {
+      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeAtlas.Mcp.exe",
       "args": [
         "-r",
         "C:\\Projects\\TargetApp"
@@ -80,8 +80,8 @@ If targeting a fixed repository:
 ```json
 {
   "mcpServers": {
-    "codegraph": {
-      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+    "codeatlas": {
+      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeAtlas.Mcp.exe",
       "args": []
     }
   }
@@ -92,17 +92,17 @@ If targeting a fixed repository:
 
 ### C. Cursor (`.cursor/mcp.json` or Cursor Settings -> Features -> MCP)
 
-**Name:** `codegraph`  
+**Name:** `codeatlas`  
 **Type:** `command`  
-**Command:** `D:\Projects\C#\CodeGraphMcp\publish\server\CodeGraphMcp.Server.exe`
+**Command:** `D:\Projects\C#\CodeGraphMcp\publish\server\CodeAtlas.Mcp.exe`
 
 Or in `.cursor/mcp.json`:
 
 ```json
 {
   "mcpServers": {
-    "codegraph": {
-      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+    "codeatlas": {
+      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeAtlas.Mcp.exe",
       "args": []
     }
   }
@@ -118,8 +118,8 @@ In your MCP settings (`cline_mcp_settings.json`):
 ```json
 {
   "mcpServers": {
-    "codegraph": {
-      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeGraphMcp.Server.exe",
+    "codeatlas": {
+      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeAtlas.Mcp.exe",
       "args": [],
       "disabled": false,
       "autoApprove": []
@@ -148,7 +148,7 @@ Once connected, AI assistants gain access to these 7 tools:
 | `get_symbol_definition` | Retrieves exact source code, precise line range (StartLine to EndLine), signature, and doc comments for a symbol. Accepts `withReferences: true` to include incoming call sites. Reads dirty buffer if unsaved changes exist on disk. Automatically scopes to active project index. | `symbolName`, `symbolType`, `filePath`, `targetDirectory`, `withReferences` |
 | `find_symbol_callers` | Queries symbol reference graph to find all caller invocations across the project. | `symbolName`, `targetDirectory` |
 | `search_codebase_graph` | Symbol name search with automatic substring matching (plain 'User' matches 'UserService'/'UserModel'; % wildcards optional) with type and language filtering. Supports `exactMatch: true` for exact symbol name matching, `regex: "..."` filtering, and `limit` (default 20, 0 for expanded/unlimited up to 500). Auto-scopes to workspace. | `pattern`, `symbolType`, `language`, `targetDirectory`, `exactMatch`, `regex`, `limit` |
-| `get_supported_languages` | Discovers supported file extensions and language parsers actively enabled on the CodeGraphMcp server. | *None* |
+| `get_supported_languages` | Discovers supported file extensions and language parsers actively enabled on the CodeAtlas server. | *None* |
 | `get_diff_impact` | Analyzes git diffs and dirty buffer to evaluate blast radius before refactoring. | `sinceCommit`, `targetDirectory` |
 | `get_servicestack_dto_contract` | Resolves cross-stack C# DTO -> TypeScript interface -> Angular component mappings. | `dtoName`, `targetDirectory` |
 | `prune_indexed_worktrees` | Scans index storage registry for database caches whose underlying repository folders or git worktrees no longer exist on disk, purging obsolete `.db` cache files and freeing disk space. Runs automatically on startup. | `dbDir`, `dryRun` |
@@ -159,7 +159,7 @@ Once connected, AI assistants gain access to these 7 tools:
 
 When an AI assistant has access to multiple tools, standard LLM tool-selection heuristics often default to native built-ins like `grep_search` or CLI terminal commands (`Get-ChildItem`, `dir`, `grep`) due to tool registration prominence or false assumptions about indexing latency.
 
-To ensure AI assistants consistently prioritize `CodeGraphMcp` over text-search and terminal probing, configure system prompt interception rules for your AI engine:
+To ensure AI assistants consistently prioritize `CodeAtlas` over text-search and terminal probing, configure system prompt interception rules for your AI engine:
 
 ### A. GitHub Copilot (`.copilot/copilot-instructions.md`)
 
@@ -175,7 +175,7 @@ This is not a guideline. This is step 0 of every search or investigation turn, w
 1. Check if the target repository contains indexed code (C#, TypeScript, JavaScript, HTML, JSON, YAML, CSS, PowerShell).
 2. **Execute `search_codebase_graph` or `get_symbol_definition` FIRST.**
 3. Use `exactMatch: true` for exact symbol lookups to prevent context noise, and `regex: "..."` for pattern filtering.
-4. Use precise `StartLine` and `EndLine` ranges returned by `CodeGraphMcp` to perform targeted partial file reads instead of loading entire source files into context window budget.
+4. Use precise `StartLine` and `EndLine` ranges returned by `CodeAtlas` to perform targeted partial file reads instead of loading entire source files into context window budget.
 
 **Exemptions (narrow):**
 - Searching non-code assets (e.g. Markdown documentation, images, binary assets, raw log files).
@@ -190,9 +190,9 @@ Add the search priority strategy rule directly to your global or project `.agent
 
 ```markdown
 # Codebase Search Strategy Rule
-- **Prioritise CodeGraphMcp**: When searching inside indexed projects (C#, TypeScript, JavaScript, HTML, JSON, YAML, CSS, PowerShell), ALWAYS prioritize `CodeGraphMcp` tools (`search_codebase_graph`, `get_symbol_definition`, `find_symbol_callers`) over `grep_search` or terminal commands due to sub-300ms indexing and sub-50ms query speeds.
+- **Prioritise CodeAtlas**: When searching inside indexed projects (C#, TypeScript, JavaScript, HTML, JSON, YAML, CSS, PowerShell), ALWAYS prioritize `CodeAtlas` tools (`search_codebase_graph`, `get_symbol_definition`, `find_symbol_callers`) over `grep_search` or terminal commands due to sub-300ms indexing and sub-50ms query speeds.
 - **Line Range Scoping**: Use returned `StartLine` to `EndLine` ranges for scoped file viewing rather than loading entire 1000+ line source files.
-- **Grep / CLI Fallback**: Use `grep_search` or CLI shell tools only as a fallback if `CodeGraphMcp` fails, is unavailable, or when searching un-indexed text assets (Markdown docs, raw logs).
+- **Grep / CLI Fallback**: Use `grep_search` or CLI shell tools only as a fallback if `CodeAtlas` fails, is unavailable, or when searching un-indexed text assets (Markdown docs, raw logs).
 ```
 
 ---
@@ -202,21 +202,21 @@ Add the search priority strategy rule directly to your global or project `.agent
 - **Clean Stdio Pipe:** All application logs and diagnostic output are routed exclusively to `stderr` (with LogLevel set to `Warning`). `stdout` is dedicated entirely to JSON-RPC protocol transport.
 - **Index Database Missing:** If a tool returns a message indicating no index database was found, run the `index` CLI command first:
   ```powershell
-  CodeGraphMcp.exe index "C:\Projects\TargetApp" --store-local
+  CodeAtlas.exe index "C:\Projects\TargetApp" --store-local
   ```
-- **Database Locks:** `CodeGraphMcp` uses SQLite in Write-Ahead Logging (`WAL`) mode with read-only connection pooling during queries to prevent database locking errors.
+- **Database Locks:** `CodeAtlas` uses SQLite in Write-Ahead Logging (`WAL`) mode with read-only connection pooling during queries to prevent database locking errors.
 
 ---
 
 ## 7. Local Inter-Agent Relay Service (AGY ↔ Copilot)
 
-`CodeGraphMcp` includes a zero-installer, user-level PowerShell background relay daemon located in `./scripts/relay/`. This service allows **AGY (Antigravity)** and **GitHub Copilot** to exchange messages and context directly over a local HTTP endpoint without triggering IDE workspace permission prompts or requiring local Administrator elevation.
+`CodeAtlas` includes a zero-installer, user-level PowerShell background relay daemon located in `./scripts/relay/`. This service allows **AGY (Antigravity)** and **GitHub Copilot** to exchange messages and context directly over a local HTTP endpoint without triggering IDE workspace permission prompts or requiring local Administrator elevation.
 
 ### Architecture
-- **Daemon script:** [RelayService.ps1](file:///d:/Projects/C%23/CodeGraphMcp/scripts/relay/RelayService.ps1) — High-performance `System.Net.HttpListener` on `http://localhost:9123/`.
-- **Zero-flash launcher:** [RunHidden.vbs](file:///d:/Projects/C%23/CodeGraphMcp/scripts/relay/RunHidden.vbs) — VBScript launcher preventing console window pop-up flashes during startup.
-- **Installer script:** [Install-RelayService.ps1](file:///d:/Projects/C%23/CodeGraphMcp/scripts/relay/Install-RelayService.ps1) — Registers a user logon startup shortcut (`CodeGraphRelay.lnk`) in `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\`.
-- **Uninstaller script:** [Uninstall-RelayService.ps1](file:///d:/Projects/C%23/CodeGraphMcp/scripts/relay/Uninstall-RelayService.ps1) — Stops active daemon processes and removes startup shortcuts.
+- **Daemon script:** [RelayService.ps1](file:///d:/Projects/C%23/CodeAtlas/scripts/relay/RelayService.ps1) — High-performance `System.Net.HttpListener` on `http://localhost:9123/`.
+- **Zero-flash launcher:** [RunHidden.vbs](file:///d:/Projects/C%23/CodeAtlas/scripts/relay/RunHidden.vbs) — VBScript launcher preventing console window pop-up flashes during startup.
+- **Installer script:** [Install-RelayService.ps1](file:///d:/Projects/C%23/CodeAtlas/scripts/relay/Install-RelayService.ps1) — Registers a user logon startup shortcut (`CodeAtlasRelay.lnk`) in `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\`.
+- **Uninstaller script:** [Uninstall-RelayService.ps1](file:///d:/Projects/C%23/CodeAtlas/scripts/relay/Uninstall-RelayService.ps1) — Stops active daemon processes and removes startup shortcuts.
 
 ### API Endpoints
 

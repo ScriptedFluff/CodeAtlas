@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
-    Fast developer inner-loop teardown, rebuild, and service restart script for CodeGraphMcp.
+    Fast developer inner-loop teardown, rebuild, and service restart script for CodeAtlas.
 .DESCRIPTION
-    Safely terminates running CodeGraphMcp server, CLI, and relay instances to release file/socket
+    Safely terminates running CodeAtlas server, CLI, and relay instances to release file/socket
     locks, rebuilds the solution and parser plugins, and optionally restarts the relay daemon.
 .PARAMETER Configuration
     Build configuration (Debug or Release). Default is Debug.
@@ -42,10 +42,10 @@ param(
 $ErrorActionPreference = "Stop"
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $rootDir = (Resolve-Path "$PSScriptRoot/..").Path
-$slnPath = Join-Path $rootDir "CodeGraphMcp.slnx"
+$slnPath = Join-Path $rootDir "CodeAtlas.slnx"
 
 Write-Host "====================================================" -ForegroundColor Cyan
-Write-Host "  CodeGraphMcp Dev Inner-Loop Utility" -ForegroundColor Cyan
+Write-Host "  CodeAtlas Dev Inner-Loop Utility" -ForegroundColor Cyan
 Write-Host "====================================================" -ForegroundColor Cyan
 
 # -----------------------------------------------------------------------------
@@ -53,7 +53,7 @@ Write-Host "====================================================" -ForegroundCol
 # -----------------------------------------------------------------------------
 Write-Host "🛑 [1/4] Terminating active processes and socket locks..." -ForegroundColor Yellow
 
-$procNames = @("CodeGraphMcp", "CodeGraphMcp.Server", "CodeGraphMcp.Cli")
+$procNames = @("CodeAtlas", "CodeAtlas.Mcp", "CodeAtlas.Cli")
 $killedCount = 0
 
 foreach ($pName in $procNames) {
@@ -112,12 +112,12 @@ elseif (-not $NoBuild) {
     # Ensure updated parsers are copied to Server and CLI bin directories
     $parsersDir = Join-Path $rootDir "src\Parsers"
     if (Test-Path $parsersDir) {
-        $parserProjects = Get-ChildItem $parsersDir -Directory | Where-Object { $_.Name.StartsWith("CodeGraphMcp.Parsers.") }
-        $serverBinDir = Join-Path $rootDir "src\CodeGraphMcp.Server\bin\$Configuration\net10.0\Parsers"
-        $cliBinDir = Join-Path $rootDir "src\CodeGraphMcp.Cli\bin\$Configuration\net10.0\Parsers"
+        $parserProjects = Get-ChildItem $parsersDir -Directory | Where-Object { $_.Name.StartsWith("CodeAtlas.Parsers.") }
+        $serverBinDir = Join-Path $rootDir "src\CodeAtlas.Mcp\bin\$Configuration\net10.0\Parsers"
+        $cliBinDir = Join-Path $rootDir "src\CodeAtlas.Cli\bin\$Configuration\net10.0\Parsers"
 
         foreach ($proj in $parserProjects) {
-            $parserName = $proj.Name.Replace("CodeGraphMcp.Parsers.", "")
+            $parserName = $proj.Name.Replace("CodeAtlas.Parsers.", "")
             $projBin = Join-Path $proj.FullName "bin\$Configuration\net10.0"
             if (Test-Path $projBin) {
                 $targetServer = Join-Path $serverBinDir $parserName
@@ -142,8 +142,8 @@ else {
 # -----------------------------------------------------------------------------
 Write-Host "🚀 [3/4] Validating outputs & orchestrating services..." -ForegroundColor Green
 
-$serverExe = Join-Path $rootDir "src\CodeGraphMcp.Server\bin\$Configuration\net10.0\CodeGraphMcp.Server.exe"
-$cliExe = Join-Path $rootDir "src\CodeGraphMcp.Cli\bin\$Configuration\net10.0\CodeGraphMcp.exe"
+$serverExe = Join-Path $rootDir "src\CodeAtlas.Mcp\bin\$Configuration\net10.0\CodeAtlas.Mcp.exe"
+$cliExe = Join-Path $rootDir "src\CodeAtlas.Cli\bin\$Configuration\net10.0\CodeAtlas.exe"
 
 if (Test-Path $serverExe) {
     Write-Host "  -> Server Binary Ready : $serverExe" -ForegroundColor Gray
@@ -160,7 +160,7 @@ if (Test-Path $cliExe) {
 if ($RestartRelay) {
     $relayScript = Join-Path $PSScriptRoot "relay\RelayService.ps1"
     if (Test-Path $relayScript) {
-        Write-Host "  -> Launching CodeGraph Relay daemon on port $RelayPort..." -ForegroundColor Cyan
+        Write-Host "  -> Launching CodeAtlas Relay daemon on port $RelayPort..." -ForegroundColor Cyan
         Start-Process pwsh -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "-File", "`"$relayScript`"", "-Port", $RelayPort
         
         # Probe /health endpoint for up to 3 seconds
