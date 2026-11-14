@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
 namespace CodeAtlas.Commands;
 
@@ -39,6 +39,9 @@ public sealed record QuerySymbolCliDto(
     string FilePath,
     int StartLine,
     int EndLine,
+    int StartByte,
+    int EndByte,
+    string? Signature,
     string? DocComment,
     bool IsLive);
 

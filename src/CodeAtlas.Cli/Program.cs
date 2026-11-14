@@ -1,6 +1,8 @@
-﻿using System.CommandLine;
+using System.CommandLine;
 using CodeAtlas.Commands;
 using CodeAtlas.Core.Config;
+
+InstallBeacon.TryRegisterCurrentProcessQuietly();
 
 var sanitizedArgs = CommandLineSanitizer.SanitizeArgs(args);
 var rootCommand   = CommandFactory.CreateRootCommand();

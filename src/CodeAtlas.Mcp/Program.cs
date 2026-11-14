@@ -1,5 +1,7 @@
-﻿using CodeAtlas.Core.Config;
+using CodeAtlas.Core.Config;
 using CodeAtlas.Mcp;
+
+InstallBeacon.TryRegisterCurrentProcessQuietly();
 
 string? repoPath = null;
 string? dbDir = null;

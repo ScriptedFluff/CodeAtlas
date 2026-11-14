@@ -1,4 +1,4 @@
-﻿using System.CommandLine;
+using System.CommandLine;
 using System.Text.Json;
 using CodeAtlas.Commands;
 using CodeAtlas.Core.Db;
@@ -27,9 +27,9 @@ public class QueryCommandHandlerTests : IDisposable
 
         var symbols = new List<Symbol>
         {
-            new() { SymbolName = "GetCustomerRequest", SymbolType = SymbolType.Class, FilePath = "src/Dto.cs", StartLine = 10, EndLine = 20, StartByte = 100, EndByte = 200, Language = "csharp" },
-            new() { SymbolName = "GetCustomerResponse", SymbolType = SymbolType.Class, FilePath = "src/Dto.cs", StartLine = 25, EndLine = 35, StartByte = 250, EndByte = 350, Language = "csharp" },
-            new() { SymbolName = "CustomerService", SymbolType = SymbolType.Class, FilePath = "src/CustomerService.cs", StartLine = 1, EndLine = 50, StartByte = 0, EndByte = 500, Language = "csharp" }
+            new() { SymbolName = "GetCustomerRequest", SymbolType = SymbolType.Class, FilePath = "src/Dto.cs", StartLine = 10, EndLine = 20, StartByte = 100, EndByte = 200, Signature = "public sealed record GetCustomerRequest(int Id)", Language = "csharp" },
+            new() { SymbolName = "GetCustomerResponse", SymbolType = SymbolType.Class, FilePath = "src/Dto.cs", StartLine = 25, EndLine = 35, StartByte = 250, EndByte = 350, Signature = "public sealed record GetCustomerResponse(string Name)", Language = "csharp" },
+            new() { SymbolName = "CustomerService", SymbolType = SymbolType.Class, FilePath = "src/CustomerService.cs", StartLine = 1, EndLine = 50, StartByte = 0, EndByte = 500, Signature = "public class CustomerService : ICustomerService", Language = "csharp" }
         };
         _db.Symbols.UpsertFile("src/Dto.cs", symbols);
     }
@@ -88,6 +88,12 @@ public class QueryCommandHandlerTests : IDisposable
             Assert.Equal(1, symsArr.GetArrayLength());
             Assert.True(symsArr[0].TryGetProperty("name", out var nameEl) || symsArr[0].TryGetProperty("Name", out nameEl));
             Assert.Equal("GetCustomerRequest", nameEl.GetString());
+            Assert.True(symsArr[0].TryGetProperty("startByte", out var sbEl) || symsArr[0].TryGetProperty("StartByte", out sbEl));
+            Assert.Equal(100, sbEl.GetInt32());
+            Assert.True(symsArr[0].TryGetProperty("endByte", out var ebEl) || symsArr[0].TryGetProperty("EndByte", out ebEl));
+            Assert.Equal(200, ebEl.GetInt32());
+            Assert.True(symsArr[0].TryGetProperty("signature", out var sigEl) || symsArr[0].TryGetProperty("Signature", out sigEl));
+            Assert.Equal("public sealed record GetCustomerRequest(int Id)", sigEl.GetString());
             Assert.True(rootEl.TryGetProperty("transpiledToSql", out var transEl) || rootEl.TryGetProperty("TranspiledToSql", out transEl));
             Assert.True(transEl.GetBoolean());
         }

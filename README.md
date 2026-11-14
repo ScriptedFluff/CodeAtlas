@@ -219,3 +219,9 @@ Whether inspecting symbol caller graphs, tuning AST parsers, or benchmarking Nat
 - [USAGE.md](file:///d:/Projects/C%23/CodeGraphMcp/USAGE.md) — Comprehensive CLI & tool command reference.
 - [MCP-CONFIGURE.md](file:///d:/Projects/C%23/CodeGraphMcp/MCP-CONFIGURE.md) — Multi-IDE & AI engine MCP setup guide.
 - [developer.md](file:///d:/Projects/C%23/CodeGraphMcp/developer.md) — Architecture & developer contributor guide.
+
+---
+
+## 🔗 Linked & Companion Projects
+
+- **[CodeAtlas.Traits](https://github.com/ScriptedFluff/CodeAtlas.Traits)** — Companion capability, behaviour, and technology indexing layer (`traits.db`) for `CodeAtlas`. Indexes classes and methods by *what they do* using content-addressable `body_hash` digests, a multi-language developer thesaurus, and a CPU-only ONNX semantic engine to detect duplicate or overlapping logic across the codebase. Third party AI models can tag as well using the MCP endpoints, to add richer tagging.

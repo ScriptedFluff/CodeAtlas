@@ -265,6 +265,9 @@ public static class QueryCommandHandler
                     FilePath: sym.FilePath,
                     StartLine: sym.StartLine,
                     EndLine: sym.EndLine,
+                    StartByte: sym.StartByte,
+                    EndByte: sym.EndByte,
+                    Signature: sym.Signature,
                     DocComment: sym.DocComment,
                     IsLive: true));
             }
@@ -284,6 +287,9 @@ public static class QueryCommandHandler
                     FilePath: sym.FilePath,
                     StartLine: sym.StartLine,
                     EndLine: sym.EndLine,
+                    StartByte: sym.StartByte,
+                    EndByte: sym.EndByte,
+                    Signature: sym.Signature,
                     DocComment: sym.DocComment,
                     IsLive: false));
             }
