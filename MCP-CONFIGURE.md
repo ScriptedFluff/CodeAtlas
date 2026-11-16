@@ -14,9 +14,10 @@ pwsh -File ./scripts/publish.ps1
 ```
 
 The compiled executables and plugins will be located at:
-- Server Daemon: `D:\Projects\C#\CodeAtlas\publish\server\CodeAtlas.Mcp.exe`
-- CLI Utility: `D:\Projects\C#\CodeAtlas\publish\cli\CodeAtlas.Cli.exe`
-- Drop-in Plugins: `D:\Projects\C#\CodeAtlas\publish\server\Parsers\`
+
+- Server Daemon: `publish/server/CodeAtlas.Mcp.exe` (e.g. `C:\Work\others\Atlas\publish\server\CodeAtlas.Mcp.exe`)
+- CLI Utility: `publish/CodeAtlas.exe` (e.g. `C:\Work\others\Atlas\publish\CodeAtlas.exe`)
+- Drop-in Plugins: `publish/server/Parsers\`
 
 ---
 
@@ -25,6 +26,7 @@ The compiled executables and plugins will be located at:
 `CodeAtlas.Mcp` runs as a high-performance MCP stdio server with full dynamic drop-in parser support:
 
 ### Mode A: Dynamic / Unbound Mode (Recommended)
+
 In this mode, no target repository is hardcoded at server launch. The server will resolve repository paths dynamically when tools are invoked, using either an explicit `targetDirectory` argument or defaulting to the client's current active workspace directory.
 
 ```powershell
@@ -32,6 +34,7 @@ In this mode, no target repository is hardcoded at server launch. The server wil
 ```
 
 ### Mode B: Bound Repository Mode
+
 In this mode, the server is locked to a specific repository path. Every tool query automatically targets this index unless explicitly overridden.
 
 ```powershell
@@ -42,7 +45,7 @@ In this mode, the server is locked to a specific repository path. Every tool que
 
 ## 3. Client Configuration Examples
 
-### A. Antigravity / Gemini AI (`.gemini/config/mcp_config.json` or workspace `mcp_config.json`)
+### A. Antigravity / Gemini AI (`%USERPROFILE%\.gemini\config\mcp_config.json` or `%USERPROFILE%\.gemini\antigravity-cli\mcp_config.json`)
 
 Add the following entry to your `mcp_config.json`:
 
@@ -50,7 +53,7 @@ Add the following entry to your `mcp_config.json`:
 {
   "mcpServers": {
     "codeatlas": {
-      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeAtlas.Mcp.exe",
+      "command": "C:\\Work\\others\\Atlas\\publish\\server\\CodeAtlas.Mcp.exe",
       "args": []
     }
   }
@@ -63,7 +66,7 @@ If targeting a fixed repository:
 {
   "mcpServers": {
     "codeatlas": {
-      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeAtlas.Mcp.exe",
+      "command": "C:\\Work\\others\\Atlas\\publish\\server\\CodeAtlas.Mcp.exe",
       "args": [
         "-r",
         "C:\\Projects\\TargetApp"
@@ -81,7 +84,7 @@ If targeting a fixed repository:
 {
   "mcpServers": {
     "codeatlas": {
-      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeAtlas.Mcp.exe",
+      "command": "C:\\Work\\others\\Atlas\\publish\\server\\CodeAtlas.Mcp.exe",
       "args": []
     }
   }
@@ -94,7 +97,7 @@ If targeting a fixed repository:
 
 **Name:** `codeatlas`  
 **Type:** `command`  
-**Command:** `D:\Projects\C#\CodeGraphMcp\publish\server\CodeAtlas.Mcp.exe`
+**Command:** `C:\Work\others\Atlas\publish\server\CodeAtlas.Mcp.exe`
 
 Or in `.cursor/mcp.json`:
 
@@ -102,7 +105,7 @@ Or in `.cursor/mcp.json`:
 {
   "mcpServers": {
     "codeatlas": {
-      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeAtlas.Mcp.exe",
+      "command": "C:\\Work\\others\\Atlas\\publish\\server\\CodeAtlas.Mcp.exe",
       "args": []
     }
   }
@@ -119,7 +122,7 @@ In your MCP settings (`cline_mcp_settings.json`):
 {
   "mcpServers": {
     "codeatlas": {
-      "command": "D:\\Projects\\C#\\CodeGraphMcp\\publish\\server\\CodeAtlas.Mcp.exe",
+      "command": "C:\\Work\\others\\Atlas\\publish\\server\\CodeAtlas.Mcp.exe",
       "args": [],
       "disabled": false,
       "autoApprove": []
@@ -141,7 +144,7 @@ In your MCP settings (`cline_mcp_settings.json`):
 
 ## 5. Available MCP Tools
 
-Once connected, AI assistants gain access to these 7 tools:
+Once connected, AI assistants gain access to these 9 tools:
 
 | Tool Name | Purpose | Key Parameters |
 | :--- | :--- | :--- |
@@ -152,6 +155,8 @@ Once connected, AI assistants gain access to these 7 tools:
 | `get_diff_impact` | Analyzes git diffs and dirty buffer to evaluate blast radius before refactoring. | `sinceCommit`, `targetDirectory` |
 | `get_servicestack_dto_contract` | Resolves cross-stack C# DTO -> TypeScript interface -> Angular component mappings. | `dtoName`, `targetDirectory` |
 | `prune_indexed_worktrees` | Scans index storage registry for database caches whose underlying repository folders or git worktrees no longer exist on disk, purging obsolete `.db` cache files and freeing disk space. Runs automatically on startup. | `dbDir`, `dryRun` |
+| `sync_file` | Surgically indexes or purges a single file in the SQLite knowledge graph in milliseconds (< 20ms). In-place updates preserve existing caller references. Supports in-memory content to sync uncommitted editor buffers. | `filePath`, `content`, `remove`, `targetDirectory` |
+| `sync_git_diff` | Performs a fast incremental delta sync of all git-modified and dirty files against the local SQLite index without requiring a full repository scan. | `targetDirectory` |
 
 ---
 
@@ -201,22 +206,25 @@ Add the search priority strategy rule directly to your global or project `.agent
 
 - **Clean Stdio Pipe:** All application logs and diagnostic output are routed exclusively to `stderr` (with LogLevel set to `Warning`). `stdout` is dedicated entirely to JSON-RPC protocol transport.
 - **Index Database Missing:** If a tool returns a message indicating no index database was found, run the `index` CLI command first:
+
   ```powershell
   CodeAtlas.exe index "C:\Projects\TargetApp" --store-local
   ```
+
 - **Database Locks:** `CodeAtlas` uses SQLite in Write-Ahead Logging (`WAL`) mode with read-only connection pooling during queries to prevent database locking errors.
 
 ---
 
-## 7. Local Inter-Agent Relay Service (AGY ↔ Copilot)
+## 8. Local Inter-Agent Relay Service (AGY ↔ Copilot)
 
 `CodeAtlas` includes a zero-installer, user-level PowerShell background relay daemon located in `./scripts/relay/`. This service allows **AGY (Antigravity)** and **GitHub Copilot** to exchange messages and context directly over a local HTTP endpoint without triggering IDE workspace permission prompts or requiring local Administrator elevation.
 
 ### Architecture
-- **Daemon script:** [RelayService.ps1](file:///d:/Projects/C%23/CodeAtlas/scripts/relay/RelayService.ps1) — High-performance `System.Net.HttpListener` on `http://localhost:9123/`.
-- **Zero-flash launcher:** [RunHidden.vbs](file:///d:/Projects/C%23/CodeAtlas/scripts/relay/RunHidden.vbs) — VBScript launcher preventing console window pop-up flashes during startup.
-- **Installer script:** [Install-RelayService.ps1](file:///d:/Projects/C%23/CodeAtlas/scripts/relay/Install-RelayService.ps1) — Registers a user logon startup shortcut (`CodeAtlasRelay.lnk`) in `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\`.
-- **Uninstaller script:** [Uninstall-RelayService.ps1](file:///d:/Projects/C%23/CodeAtlas/scripts/relay/Uninstall-RelayService.ps1) — Stops active daemon processes and removes startup shortcuts.
+
+- **Daemon script:** [`scripts/relay/RelayService.ps1`](file:///C:/Work/others/Atlas/scripts/relay/RelayService.ps1) — High-performance `System.Net.HttpListener` on `http://localhost:9123/`.
+- **Zero-flash launcher:** [`scripts/relay/RunHidden.vbs`](file:///C:/Work/others/Atlas/scripts/relay/RunHidden.vbs) — VBScript launcher preventing console window pop-up flashes during startup.
+- **Installer script:** [`scripts/relay/Install-RelayService.ps1`](file:///C:/Work/others/Atlas/scripts/relay/Install-RelayService.ps1) — Registers a user logon startup shortcut (`CodeAtlasRelay.lnk`) in `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\`.
+- **Uninstaller script:** [`scripts/relay/Uninstall-RelayService.ps1`](file:///C:/Work/others/Atlas/scripts/relay/Uninstall-RelayService.ps1) — Stops active daemon processes and removes startup shortcuts.
 
 ### API Endpoints
 
@@ -244,4 +252,3 @@ Invoke-RestMethod -Uri "http://localhost:9123/receive?client=copilot"
 # Uninstall relay service
 .\scripts\relay\Uninstall-RelayService.ps1
 ```
-
